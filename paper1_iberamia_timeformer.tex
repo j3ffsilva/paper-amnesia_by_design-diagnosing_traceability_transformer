@@ -219,133 +219,150 @@ setting, not a claim about open-domain historical language.
 
 \section{Timeformer Architecture}
 % Target length: 2.0 pages.
-The full Timeformer extends a standard Transformer with two components:
-token-time interaction at the input layer and causal prototype memory before
-the encoder. We evaluate it through a controlled design chain. Standard (no
-temporal signal) and Additive (global time vector, no token-time binding) are
-baselines representing simpler alternatives. Joint removes only the memory
-component from the full model, making it the direct ablation. The chain
-answers three questions: Is a global period signal sufficient? Does period
-information need to be bound to each token before contextualization? Does
-causal subject history help beyond token-time interaction?
+Timeformer is designed to make a subject representation depend explicitly on
+the period in which the subject is queried. The full model adds two mechanisms
+to a standard Transformer encoder. First, it binds token identity and period at
+the input layer. Second, it lets the current subject consult causal historical
+prototypes before the encoder. We introduce these mechanisms through a
+controlled design comparison: two baselines, one direct ablation, and the full
+Timeformer.
 
-All models share the same forward structure. A sentence is tokenized as
-\texttt{[CLS] S V O [SEP]}, each token \(w_i\) is mapped to an input embedding
-\(x_i \in \mathbb{R}^d\), the sequence \((x_1,\ldots,x_n)\) is processed by a
-Transformer encoder, and \(h_s = \mathrm{Enc}(x_1,\ldots,x_n)[s] \in
-\mathbb{R}^d\) is the \texttt{token@time} representation queried by all
-diagnostics. All models are trained with masked language modeling (MLM): a
-fraction of tokens are masked and the model is trained to reconstruct them
-from the remaining tokens and the period signal when present. What changes
-across the chain is how \(x_i\) is constructed.
+All models follow the same outer pipeline. A sentence is tokenized as
+\texttt{[CLS] S V O [SEP]}. Each token \(w_i\) is mapped to an input embedding
+\(x_i \in \mathbb{R}^d\). The sequence \((x_1,\ldots,x_n)\) is processed by a
+Transformer encoder, and the final hidden state at the subject position,
+\[
+  h_s = \mathrm{Enc}(x_1,\ldots,x_n)[s],
+\]
+is the \texttt{token@time} representation inspected by the diagnostics. All
+models are trained with masked language modeling (MLM): some tokens are masked,
+and the model must reconstruct them from the remaining tokens and, when
+available, the period input. What changes across the design comparison is how
+the subject's input embedding \(x_s\) is built before the encoder sees the
+sentence.
 
-Additive, Joint, and Timeformer share a \emph{time representation}
-\(\tau(t) \in \mathbb{R}^d\): the vector encoding of the current period.
-Concretely, it is a learned projection of sinusoidal features of \(t/T\) into
-\(\mathbb{R}^d\), where \(T\) is the total number of training periods. This encodes the period index as a continuous, order-preserving
-vector, entirely distinct from the token-position encoding \(p_i\). Additive
-and Joint differ in how they combine \(\tau(t)\) with token identity; the full
-Timeformer then adds causal memory on top of Joint.
-Figure~\ref{fig:architecture} shows the full design chain.
+The temporally informed models use a shared period vector
+\(\tau(t) \in \mathbb{R}^d\). It is a learned projection of sinusoidal features
+of \(t/T\), where \(T\) is the total number of training periods. In plain terms,
+\(\tau(t)\) is the vector representation of the current period. It is distinct
+from the position encoding \(p_i\), which only tells the Transformer whether a
+token is in subject, verb, or object position. Additive and Joint differ in how
+they combine \(\tau(t)\) with token identity; the full Timeformer then adds
+causal memory on top of Joint. Figure~\ref{fig:architecture} summarizes the
+comparison.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{outputs/figures/figure2_architecture_detail.png}
-\caption{The controlled design chain. \textbf{Standard}: standard Transformer
-with no temporal signal — null hypothesis baseline. \textbf{Additive}: global
-time offset added to all embeddings — temporal baseline. \textbf{Joint}: joint
-token-time projection, Timeformer without the memory component — direct
-ablation. \textbf{Timeformer}: full model, extending Joint with Prototype
-Memory and Temporal Attention. New components at each step are highlighted in
-yellow; dashed grey boxes mark inactive components.}
+\caption{Controlled design comparison. \textbf{Standard}: Transformer baseline
+with no temporal signal. \textbf{Additive}: temporal baseline that adds the same
+period vector to every token. \textbf{Joint}: direct ablation of Timeformer
+without memory, using joint token-time projection. \textbf{Timeformer}: full
+model, extending Joint with Prototype Memory and Temporal Attention. New
+components are highlighted in yellow; dashed grey boxes mark inactive
+components.}
 \label{fig:architecture}
 \end{figure}
 
-\subsection{Baseline: Standard Transformer}
-Standard asks whether a model with no temporal information can achieve
-traceability. The input embedding \(x_i = e(w_i) + p_i\) combines a learned
-token embedding \(e(w_i) \in \mathbb{R}^d\) with a sinusoidal position
-encoding \(p_i \in \mathbb{R}^d\). No period signal enters \(x_i\), so
-\texttt{S5 V2 O3} at \(t0\) and at \(t9\) produce the same \(h_s\) —
-the null hypothesis for traceability.
+\subsection{Baseline 1: Standard Transformer}
+The Standard baseline asks whether temporal traceability appears without any
+period input. Its input embedding is the usual sum of a token embedding and a
+position encoding:
+\[
+  x_i = e(w_i) + p_i .
+\]
+For the subject in \texttt{S5 V2 O3}, this gives
+\(x_s=e(\texttt{S5})+p_1\). Because no period signal enters the model, the
+same sentence at \(t0\) and \(t9\) has the same input sequence and therefore
+the same \(h_s\). Standard is the null hypothesis: any temporal behavior must
+come only from changes in the observed words, not from an explicit
+\texttt{token@time} representation.
 
-\subsection{Additive Time-Conditioned Transformer}
-Additive asks whether knowing the period is enough. It injects \(\tau(t)\)
-into every input embedding by addition:
+\subsection{Baseline 2: Additive Time-Conditioned Transformer}
+The Additive baseline asks whether knowing the current period is enough. It
+adds the same period vector \(\tau(t)\) to every token:
 
 \[
   x_i = e(w_i) + p_i + \tau(t).
 \]
 
-The same \(\tau(t)\) is added to every token regardless of identity. For
-example, the subject embedding for \texttt{S5} in \texttt{S5 V2 O3} is
-\(e(\texttt{S5}) + p_1 + \tau(0)\) at \(t0\) and
-\(e(\texttt{S5}) + p_1 + \tau(9)\) at \(t9\): the model can distinguish the
-two periods. However, the same change from \(\tau(0)\) to \(\tau(9)\) is also
-applied to \texttt{V2} and \texttt{O3}; the temporal signal is global rather
-than token-specific. The model receives the current period, but period and
-token identity do not interact at the input layer — any token-specific
-temporal effect must emerge implicitly downstream. This isolates whether
-global period information alone is sufficient for traceability. Joint tests
-the next step: making that interaction explicit.
+Now \texttt{S5 V2 O3} at \(t0\) and \(t9\) are distinguishable. The subject
+embedding is \(e(\texttt{S5})+p_1+\tau(0)\) at \(t0\), and
+\(e(\texttt{S5})+p_1+\tau(9)\) at \(t9\). However, the same temporal change is
+also applied to the verb and object: \texttt{V2} receives
+\(e(\texttt{V2})+p_2+\tau(t)\), and \texttt{O3} receives
+\(e(\texttt{O3})+p_3+\tau(t)\). Thus Additive tells the whole sentence which
+period it belongs to, but it does not explicitly bind period to each token's
+identity. If Additive succeeds, global period information is sufficient. If it
+does not, the next question is whether the period must interact with each token
+before contextualization.
 
-\subsection{Token-Time Transformer}
-The Token-Time Transformer, labelled Joint in Figure~\ref{fig:architecture},
-asks whether the period must be explicitly bound to each token before
-contextualization. It projects token identity and time jointly:
+\subsection{Direct Ablation: Token-Time Transformer}
+The Token-Time Transformer, labelled Joint in Figure~\ref{fig:architecture}, is
+the full Timeformer without the memory component. It asks whether explicit
+token-time interaction is enough. Instead of adding the same period vector to
+all tokens, Joint concatenates each token embedding with \(\tau(t)\) and
+projects the pair:
 
 \[
   x_i = W [e(w_i);\, \tau(t)] + p_i ,
 \]
 
 where \(e(w_i), \tau(t) \in \mathbb{R}^d\) and \(W \in \mathbb{R}^{d \times
-2d}\). Unlike Additive, the temporal change is not a shared offset: it is
-computed jointly from token identity and period. The same \(\tau(t)\) is
-projected together with \(e(\texttt{S5})\), \(e(\texttt{V2})\), and
-\(e(\texttt{O3})\) separately, so the same period can affect different tokens
-differently. Concretely, \texttt{S5} at \(t0\) receives
-\(W[e(\texttt{S5});\,\tau(0)] + p_1\), while \texttt{S5} at \(t9\) receives
-\(W[e(\texttt{S5});\,\tau(9)] + p_1\). The subject embedding differs before
-any self-attention, so \(h_s(\texttt{S5},t0)\) and \(h_s(\texttt{S5},t9)\)
-can diverge in subject-specific directions.
+2d}\). The difference from Additive is visible in the example. At \(t9\), the
+period vector is combined separately with \texttt{S5}, \texttt{V2}, and
+\texttt{O3}. The model computes \(W[e(\texttt{S5});\tau(9)]\),
+\(W[e(\texttt{V2});\tau(9)]\), and \(W[e(\texttt{O3});\tau(9)]\) as separate
+inputs. The same period can therefore affect the subject differently from the
+verb or object. For traceability, the key case is the subject:
+\texttt{S5} at \(t0\) receives \(W[e(\texttt{S5});\tau(0)] + p_1\), while
+\texttt{S5} at \(t9\) receives \(W[e(\texttt{S5});\tau(9)] + p_1\). The
+subject starts from an epoch-specific input before self-attention, making
+\(h_s(\texttt{S5},t0)\) and \(h_s(\texttt{S5},t9)\) free to move in different
+semantic directions.
 
 \subsection{Timeformer: Full Architecture}
-Timeformer asks whether causal history helps beyond token-time interaction.
-It extends Joint with a Prototype Memory and a temporal attention module with
-a learned gate that update the subject embedding before it enters the encoder. In plain terms,
-temporal attention lets the current subject representation select which
-previous subject prototypes are most relevant to the current period.
+The full Timeformer asks whether causal history helps beyond token-time
+interaction. It starts exactly like Joint: for a current sentence containing
+\texttt{S5} at \(t7\), the model first builds token-time input embeddings for
+\texttt{[CLS] S5 V O [SEP]}. It then modifies only the subject embedding before
+the Transformer encoder sees the sentence.
 
-Timeformer stores one historical prototype per subject and period. A prototype
-\(m(s,t)\) is the average representation of subject \(s\) across all training
-sentences from period \(t\). The memory is causal: when processing subject
-\texttt{S5} at \(t7\), the model may consult only the earlier prototypes
-\(\{m(\texttt{S5},0),\ldots,m(\texttt{S5},6)\}\).
+The additional information comes from Prototype Memory. Timeformer stores one
+prototype vector per subject and past period. A prototype \(m(s,t)\) is the
+average representation of subject \(s\) across training sentences from period
+\(t\). The memory is causal: at \(t7\), the model may consult
+\(\{m(\texttt{S5},0),\ldots,m(\texttt{S5},6)\}\), but not prototypes from
+\(t7\) or later.
 
-Timeformer first builds the Joint input embedding for the current sentence.
-Then it uses temporal attention to compare the current subject embedding
-\(x_s\) with the available past prototypes \(M_s\), written as a matrix where
-each row is one causal prototype; \(x_s\) serves as the query and \(M_s\)
-provides keys and values. The attention output is a summary of the subject's
-relevant history. A learned gate controls how much of that summary is added
-back into the current subject embedding.
+Temporal attention turns this list of past prototypes into a history summary
+for the current subject. Let \(x_s\) be the current Joint subject embedding and
+let \(M_s\) be the matrix of available causal prototypes, one row per past
+period. The attention operation uses \(x_s\) as the query and \(M_s\) as keys
+and values:
 
-Formally, the updated subject embedding is:
+\[
+  r_s = \mathrm{Attn}(x_s, M_s, M_s).
+\]
+
+The vector \(r_s\) summarizes the parts of the subject's history that are most
+relevant to the current period. A learned gate then decides how much this
+history summary should change the current subject embedding:
 
 \[
   \tilde{x}_s =
   x_s + g \cdot
-  \left(\mathrm{LN}(x_s + \mathrm{Attn}(x_s, M_s, M_s)) - x_s\right),
+  \left(\mathrm{LN}(x_s + r_s) - x_s\right).
 \]
 
-where \(M_s\) is the set of causal prototypes for subject \(s\). The gate
-\(g\) is initialized at zero, so the memory path starts inactive and the model
-initially behaves like the Token-Time Transformer. The updated
-\(\tilde{x}_s\) replaces \(x_s\) before the encoder, and the encoder then
-produces the final subject representation \(h_s\). Thus \(h_s\) at \(t7\) is
-informed not only by the current sentence but also by \texttt{S5}'s available
-causal prototype history — directly testing whether accumulated past
-representations help beyond what token-time interaction alone provides.
+The gate \(g\) is initialized at zero. At initialization,
+\(\tilde{x}_s=x_s\), so the full Timeformer behaves like Joint. During
+training, the model can learn to let memory affect the subject representation
+if doing so helps the MLM objective. Finally, \(\tilde{x}_s\) replaces \(x_s\)
+in the input sequence, and the Transformer encoder produces the final
+representation \(h_s\). This is the only place where Timeformer uses history:
+the verb and object embeddings are unchanged, but the subject enters the
+encoder already informed by its available causal prototype history.
 
 \section{Evaluation Protocol}
 % Target length: 1.25--1.5 pages.
