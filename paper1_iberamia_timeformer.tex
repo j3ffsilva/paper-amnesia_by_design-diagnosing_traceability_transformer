@@ -237,15 +237,32 @@ setting, not a claim about open-domain historical language.
 
 \section{Timeformer Architecture}
 % Target length: 2.0 pages.
-Timeformer is defined as an ablation family rather than as a single model. All
-variants share the same basic training interface: an input sentence is encoded
-as \texttt{[CLS] S V O [SEP]}, a Transformer encoder produces contextual hidden
-states, and an MLM head predicts masked tokens. The representation used for
-traceability diagnostics is \(h_s\), the final hidden state at the subject
-position. The variants differ only in how epoch information is made available
-to the encoder and whether the current subject representation can consult
-causal historical prototypes. Table~\ref{tab:model-variants} summarizes the
-four variants.
+Timeformer is organized as a controlled ablation chain: each variant adds
+exactly one new capability over the previous one, so that any difference in
+traceability can be attributed to that single change.
+Figure~\ref{fig:architecture} shows the complete forward path; the simpler
+variants are special cases of the same diagram. All variants share the same
+training interface: a sentence from the SVO corpus (Section~3) is encoded as
+\texttt{[CLS] S V O [SEP]}, a Transformer encoder produces contextual hidden
+states, and \(h_s\) -- the final hidden state at the subject position -- is the
+representation used for all traceability diagnostics. Variants differ only in
+which boxes in Figure~\ref{fig:architecture} are active.
+Table~\ref{tab:model-variants} summarizes the four variants.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{outputs/figures/figure2_architecture_detail.png}
+\caption{Timeformer ablation chain. Each column adds exactly one new component
+(highlighted in yellow) over the previous variant. \textbf{B1} (Static
+Transformer) encodes tokens with no temporal information. \textbf{B2a}
+(Additive) introduces the Time input \(\tau(t)\) added directly to token
+embeddings. \textbf{B2b} (Token-Time) routes both token and time through a
+joint projection \(W[\,e(w);\tau(t)\,]\) via the Token-Time Interaction box.
+\textbf{B3} (Memory-Augmented Timeformer) extends B2b with Prototype Memory
+and Temporal Attention that gate historical context into the encoder. Dashed
+grey boxes mark components absent in a given variant.}
+\label{fig:architecture}
+\end{figure}
 
 \begin{table}[t]
 \caption{Model variants in the Timeformer ablation family.}
@@ -266,80 +283,83 @@ B3 & Memory-Augmented Timeformer & Token-time interaction & Causal prototypes \\
 \end{table}
 
 \subsection{Static Transformer}
-The Static Transformer is the baseline encoder. It receives token and position
-embeddings but no explicit epoch information:
+The Static Transformer (B1) uses only the Token input box in
+Figure~\ref{fig:architecture}: no Time input, no Token-Time Interaction. For
+each input token \(w_i\), the embedding combines a learned token embedding
+\(e(w_i) \in \mathbb{R}^d\) with a fixed sinusoidal position embedding
+\(p_i \in \mathbb{R}^d\):
 
 \[
   x_i = e(w_i) + p_i .
 \]
 
-The resulting sequence is passed through a small pre-layer-normalized
-Transformer encoder. This model can learn corpus-level co-occurrence patterns,
-but it has no direct way to distinguish the representation of a subject at
-\(t0\) from the same subject at \(t9\), except through the local words observed
-in the sentence. It therefore represents the null hypothesis that temporal
-behavior can be recovered from static distributional evidence alone.
+The sequence is passed through a pre-layer-normalized Transformer encoder with
+no epoch signal. As a consequence, the sentence \texttt{S5 V2 O3} at \(t0\)
+and the same sentence at \(t9\) produce the same \(h_s\): without a temporal
+signal, the model cannot distinguish them. This is the null hypothesis for
+traceability.
 
-\subsection{Continuous Time Encoding}
-The temporally conditioned variants use a continuous encoding of epoch index
-rather than a learned lookup table. For an epoch \(t \in \{0,\ldots,T\}\), the
-index is normalized to \([0,1]\), mapped to fixed sinusoidal features, and then
-projected by a small MLP:
+\subsection{Shared Component: Continuous Time Encoding}
+The Time input box (lower left of Figure~\ref{fig:architecture}) is shared by
+B2a, B2b, and B3. Rather than a learned lookup table -- which would memorize
+training epochs as unrelated identifiers -- a continuous encoding treats epochs
+as ordered points on a shared scale, supporting interpolation and
+extrapolation. The epoch index \(t\) is normalized to \([0,1]\), passed through
+fixed sinusoidal features, and projected by a small MLP:
 
 \[
   \tau(t) = \mathrm{MLP}(\mathrm{sinusoidal}(t/T)).
 \]
 
-This supports interpolation and extrapolation: a learned embedding table would
-memorize training epochs as unrelated identifiers, whereas a continuous encoding
-treats them as ordered points on a shared scale. These sinusoidal features
-encode epoch index only and are distinct from the token-position encodings of
-the Transformer.
+These features encode epoch index only and are entirely distinct from the
+token-position encodings already present in the Transformer.
 
 \subsection{Additive Time-Conditioned Transformer}
-The Additive Time-Conditioned Transformer injects the same epoch vector into
-every token position:
+The Additive variant (B2a) routes \(\tau(t)\) from the Time input box directly
+into the token embeddings by addition, without passing through the Token-Time
+Interaction box:
 
 \[
   x_i = e(w_i) + p_i + \tau(t).
 \]
 
-This model tests the minimal effect of exposing the encoder to the current
-epoch. Because the same temporal offset is added to every token, the model is
-given global period information but no token-specific temporal modulation at
-the embedding layer. It therefore isolates the question of whether simply
-telling the model the epoch is sufficient for traceability.
+Because the same \(\tau(t)\) is added to every token regardless of its
+identity, the subject, verb, and object all receive the same temporal push.
+The model learns that a sentence belongs to epoch \(t\), but not that subject
+\texttt{S5} specifically has shifted meaning by \(t\). This variant isolates
+whether global period information alone is sufficient for traceability.
 
 \subsection{Token-Time Transformer}
-The Token-Time Transformer replaces additive conditioning with an explicit
-interaction between lexical identity and epoch. For each token, the token
-embedding and time encoding are concatenated and projected back to the model
-dimension:
+The Token-Time Transformer (B2b) activates the Token-Time Interaction box in
+Figure~\ref{fig:architecture}: the token embedding and time encoding are
+concatenated and jointly projected before self-attention:
 
 \[
-  x_i = W [e(w_i); \tau(t)] + p_i .
+  x_i = W [e(w_i);\, \tau(t)] + p_i ,
 \]
 
-Here \(e(w_i), \tau(t) \in \mathbb{R}^d\), so \(W \in \mathbb{R}^{d \times 2d}\)
-projects the concatenation back to the model dimension. Unlike the additive
-variant, this allows the same epoch vector to affect different tokens
-differently before self-attention: the same subject receives a distinct
-embedding at each epoch, which is the mechanism the paper evaluates for
-traceability.
+where \(e(w_i), \tau(t) \in \mathbb{R}^d\) and \(W \in \mathbb{R}^{d \times
+2d}\). The projection \(W\) sees token identity and epoch simultaneously, so
+the same epoch can affect different tokens differently. Concretely,
+\texttt{S5} at \(t0\) receives \(W[e(\texttt{S5});\,\tau(0)] + p_1\) while
+\texttt{S5} at \(t9\) receives \(W[e(\texttt{S5});\,\tau(9)] + p_1\): the
+initial embedding differs before any self-attention, giving the subject a
+distinct starting point at each epoch.
 
 \subsection{Memory-Augmented Timeformer}
-The Memory-Augmented Timeformer extends the Token-Time Transformer with a
-causal prototype memory. For each subject \(s\) and epoch \(t\), a prototype
-\(m(s,t)\) is computed as the mean of subject representations observed in
-training sentences for that subject and epoch. Prototypes are computed with
-stop-gradient, from training data only, and are served causally: at epoch
-\(t_k\), the model may attend only to \(\{m(s,t):t<t_k\}\).
+The Memory-Augmented Timeformer (B3) adds the lower section of
+Figure~\ref{fig:architecture}: a Prototype Memory and Temporal Attention gate
+that update the subject embedding before it enters the encoder. For each
+subject \(s\) and epoch \(t\), prototype \(m(s,t)\) is the mean of \(s\)'s
+hidden states across all training sentences at that epoch. Prototypes are fixed
+during the forward pass (no gradients flow back through them) and served in
+causal order: at \(t_k\), the model attends only to \(\{m(s,t) : t < t_k\}\).
+For example, at \(t7\) the memory for \texttt{S5} is
+\(\{m(\texttt{S5},0),\ldots,m(\texttt{S5},6)\}\) -- a summary of how that
+subject has appeared in each of the six preceding epochs.
 
-The memory module is a temporal cross-attention layer applied only to the
-subject embedding. The current subject embedding acts as the query, and the
-historical prototypes for the same subject act as keys and values. The updated
-subject embedding is then inserted back into the token sequence before the
-Transformer encoder:
+The cross-attention layer uses the current subject embedding as the query and
+the historical prototypes as keys and values. The updated embedding is:
 
 \[
   \tilde{x}_s =
@@ -347,25 +367,11 @@ Transformer encoder:
   \left(\mathrm{LN}(x_s + \mathrm{Attn}(x_s, M_s, M_s)) - x_s\right),
 \]
 
-where \(M_s\) is the causal history for subject \(s\), and \(g \in [0,1]\) is
-a learned scalar gate initialized to zero so that at the start of training
-\(\tilde{x}_s = x_s\) and the memory path is inactive. The formula
-interpolates between the original embedding (\(g=0\)) and the
-layer-normalized attended representation (\(g=1\)), allowing the model to
-gradually open the memory channel as training progresses. Applying the memory
-update before the textual encoder lets the subsequent self-attention layers
-propagate historical information from the subject to the other token positions,
-creating a path by which the MLM objective can reward useful memory use.
-
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\textwidth]{outputs/figures/figure2_architecture_detail.png}
-\caption{Architecture detail for the Token-Time Transformer and the optional
-memory-augmented extension. The memory module attends only to causal historical
-prototypes and updates the subject representation before Transformer encoding.}
-\label{fig:architecture}
-\end{figure}
+where \(M_s\) collects the causal prototypes for subject \(s\). The scalar
+gate \(g \in [0,1]\) is initialized to zero: when \(g=0\) the output equals
+\(x_s\) unchanged; when \(g=1\) it is the layer-normalized result of attending
+over past prototypes. The model opens the memory channel only if it proves
+useful under the MLM objective.
 
 \section{Evaluation Protocol}
 % Target length: 1.25--1.5 pages.
@@ -399,13 +405,9 @@ same representation regardless of the epoch label provided. Fourth, we evaluate
 continuation examples from held-out later epochs% TODO: specify which epochs are held out (e.g. t8--t9)
 \ to test whether temporal behavior extends beyond the training distribution.
 
-The ablation comparisons follow the architecture chain. The gain from
-time-conditioning is measured by comparing the Additive Time-Conditioned
-Transformer to the Static Transformer, primarily on the ambiguous split where
-local markers are uninformative. The gain from token-time interaction is
-measured by comparing the Token-Time Transformer to the additive variant on the
-same split. The memory contribution is measured by comparing the
-Memory-Augmented Timeformer to the Token-Time Transformer on continuation and
+Comparisons follow the ablation chain: B2a vs.\ B1 isolates the effect of
+global time conditioning; B2b vs.\ B2a isolates token-time interaction; B3
+vs.\ B2b isolates the memory contribution, evaluated on continuation and
 contrastive diagnostics.
 
 For the memory-augmented model, we include a shuffled-memory control (a
