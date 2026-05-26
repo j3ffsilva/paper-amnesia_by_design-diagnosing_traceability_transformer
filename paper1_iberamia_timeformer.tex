@@ -10,6 +10,7 @@
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{booktabs}
 
 \begin{document}
 
@@ -248,17 +249,18 @@ grey boxes mark components absent in a given variant.}
 \caption{Model variants in the Timeformer ablation family.}
 \label{tab:model-variants}
 \centering
-\small
-\setlength{\tabcolsep}{3pt}
-\begin{tabular}{|l|p{3.7cm}|p{3.3cm}|p{2.0cm}|}
-\hline
-ID & Public name & Temporal signal & Memory \\
-\hline
-Static & Static Transformer & None & No \\
-Additive & Additive Time-Conditioned Transformer & Global epoch vector & No \\
-Joint & Token-Time Transformer & Token-time interaction & No \\
-Timeformer & Memory-Augmented Timeformer & Token-time interaction & Causal prototypes \\
-\hline
+\footnotesize
+\renewcommand{\arraystretch}{0.88}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lp{3.2cm}p{3.0cm}p{1.8cm}}
+\toprule
+\textbf{Variant} & \textbf{Full name} & \textbf{Temporal signal} & \textbf{Memory} \\
+\midrule
+Static     & Static Transformer              & None                   & No \\
+Additive   & Additive Time-Conditioned       & Global epoch vector    & No \\
+Joint      & Token-Time Transformer          & Token-time interaction & No \\
+Timeformer & Memory-Augmented Timeformer     & Token-time interaction & Causal prototypes \\
+\bottomrule
 \end{tabular}
 \end{table}
 
@@ -439,24 +441,25 @@ class-specific controls.}
 $N_1$ proportions among nearest neighbors; \(\Delta=t9-t0\).}
 \label{tab:context-drift}
 \centering
-\small
-\setlength{\tabcolsep}{3pt}
-\begin{tabular}{|l|l|c|c|c|}
-\hline
-Class & Model & t0 & t9 & \(\Delta\) \\
-\hline
-Stable & Static Transformer & 0.736 & 0.756 & +0.020 \\
-Stable & Token-Time Transformer & 0.843 & 0.641 & -0.203 \\
-Stable & Memory-Augmented Timeformer & 0.810 & 0.658 & -0.153 \\
-\hline
-Drift & Static Transformer & 0.618 & 0.387 & -0.231 \\
-Drift & Token-Time Transformer & 0.847 & 0.233 & -0.614 \\
-Drift & Memory-Augmented Timeformer & 0.836 & 0.263 & -0.573 \\
-\hline
-Bifurcation & Static Transformer & 0.794 & 0.682 & -0.112 \\
-Bifurcation & Token-Time Transformer & 0.895 & 0.521 & -0.374 \\
-Bifurcation & Memory-Augmented Timeformer & 0.905 & 0.517 & -0.388 \\
-\hline
+\footnotesize
+\renewcommand{\arraystretch}{0.88}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{llccc}
+\toprule
+\textbf{Class} & \textbf{Model} & \textbf{t0} & \textbf{t9} & \(\boldsymbol{\Delta}\) \\
+\midrule
+Stable & Static     & 0.736 & 0.756 & +0.020 \\
+       & Joint      & 0.843 & 0.641 & -0.203 \\
+       & Timeformer & 0.810 & 0.658 & -0.153 \\
+\midrule
+Drift  & Static     & 0.618 & 0.387 & -0.231 \\
+       & Joint      & 0.847 & 0.233 & -0.614 \\
+       & Timeformer & 0.836 & 0.263 & -0.573 \\
+\midrule
+Bifurcation & Static     & 0.794 & 0.682 & -0.112 \\
+            & Joint      & 0.895 & 0.521 & -0.374 \\
+            & Timeformer & 0.905 & 0.517 & -0.388 \\
+\bottomrule
 \end{tabular}
 \end{table}
 
@@ -491,17 +494,18 @@ metric was not computed for this variant.% TODO: explain why Drift was not compu
 }
 \label{tab:main-results}
 \centering
-\scriptsize
-\setlength{\tabcolsep}{2pt}
-\begin{tabular}{|p{3.8cm}|c|c|c|c|}
-\hline
-Model & Drift & Flip & Ambig. & Cont. \\
-\hline
-Static Transformer & -0.231 & 0.000 & 0.577 & 0.719 \\
-Additive Time-Conditioned Transformer & -- & 0.690 & 0.573 & 0.754 \\
-Token-Time Transformer & -0.614 & 0.517 & 0.599 & 0.766 \\
-Memory-Augmented Timeformer & -0.573 & 0.506 & 0.599 & 0.766 \\
-\hline
+\footnotesize
+\renewcommand{\arraystretch}{0.88}
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Model} & \textbf{Drift} & \textbf{Flip} & \textbf{Ambig.} & \textbf{Cont.} \\
+\midrule
+Static     & -0.231 & 0.000 & 0.577 & 0.719 \\
+Additive   & --     & 0.690 & 0.573 & 0.754 \\
+Joint      & -0.614 & 0.517 & 0.599 & 0.766 \\
+Timeformer & -0.573 & 0.506 & 0.599 & 0.766 \\
+\bottomrule
 \end{tabular}
 \end{table}
 
@@ -524,16 +528,17 @@ linear-probe accuracy on held-out later epochs; flip is contrastive sign-flip
 rate.}
 \label{tab:memory-diagnostics}
 \centering
-\small
-\setlength{\tabcolsep}{3pt}
-\begin{tabular}{|l|c|c|p{3.0cm}|}
-\hline
-Variant & Continuation & Sign flip & Delta vs. Joint ref. \\
-\hline
-Joint reference & 0.762 & 0.448 & -- \\
-Timeformer learned & 0.775 & 0.448 & +0.013 cont.; +0.000 flip \\
-Timeformer oracle & 0.754 & 0.586 & -0.008 cont.; +0.138 flip \\
-\hline
+\footnotesize
+\renewcommand{\arraystretch}{0.88}
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{lccp{2.8cm}}
+\toprule
+\textbf{Variant} & \textbf{Cont.} & \textbf{Flip} & \textbf{$\Delta$ vs.\ Joint} \\
+\midrule
+Joint (reference)   & 0.762 & 0.448 & -- \\
+Timeformer learned  & 0.775 & 0.448 & +0.013 cont.; +0.000 flip \\
+Timeformer oracle   & 0.754 & 0.586 & $-$0.008 cont.; +0.138 flip \\
+\bottomrule
 \end{tabular}
 \end{table}
 
