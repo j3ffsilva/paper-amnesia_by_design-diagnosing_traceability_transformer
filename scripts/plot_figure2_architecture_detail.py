@@ -69,7 +69,7 @@ MEM_OFFSET  = COL_W * 0.45   # horizontal offset of sub-boxes from column center
 HS_Y_TF     = 0.11    # center of the h_s output box for Timeformer
 
 VARIANT_LABELS = [
-    "Static<br>Transformer",
+    "Standard<br>Transformer",
     "Additive<br>Time-Conditioned",
     "Joint<br>Token-Time",
     "Timeformer<br>Memory-Augmented",

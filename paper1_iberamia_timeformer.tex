@@ -34,14 +34,14 @@ periods; this gap is our focus.
 
 We introduce Timeformer, a family of Transformer encoders organized as a
 controlled ablation chain. Four variants add temporal capacity incrementally:
-Static (no time information), Additive (global time vector), Joint (token and
+Standard (no time information), Additive (global time vector), Joint (token and
 time projected jointly before self-attention), and Memory-Augmented (causal
 prototype memory). All are trained with masked language modeling on a synthetic
 benchmark with known ground-truth trajectories.
 
 The main finding is that token-time interaction is the effective traceability
 mechanism. The Joint variant produces a neighborhood drift of \(-0.614\) for
-drifting subjects, versus \(-0.231\) for Static (stable across seeds).
+drifting subjects, versus \(-0.231\) for Standard (stable across seeds).
 Probe-based accuracy gains are modest and seed-sensitive, confirming that
 geometric diagnostics are more informative than label recoverability. The
 Memory-Augmented variant shows no robust improvement; oracle analysis identifies
@@ -87,7 +87,7 @@ We call a representation \emph{temporally traceable} if the same surface token,
 queried at different periods, occupies neighborhoods consistent with its meaning
 at that period, making \texttt{token@time} a directly inspectable object. This
 paper introduces Timeformer, a family of Transformer encoders organized as a
-controlled ablation chain: Static (no time information), Additive (global time
+controlled ablation chain: Standard (no time information), Additive (global time
 vector), Joint (token and time projected jointly before self-attention), and
 Memory-Augmented (causal prototype memory). This design isolates which form of
 temporal conditioning produces traceability. We study this in a controlled
@@ -218,41 +218,39 @@ setting, not a claim about open-domain historical language.
 
 \section{Timeformer Architecture}
 % Target length: 2.0 pages.
-Timeformer is a Transformer encoder with two targeted modifications for
-period-indexed representations. The \emph{input embedding layer} conditions each
-token on time \(t\) before self-attention; the \emph{pre-encoder
-memory gate} attends to causal historical prototypes of the subject token. The
-self-attention core and feed-forward layers are unchanged from a standard
-Transformer. Timeformer is designed as a \emph{specialized encoder replacement}:
-trained from scratch when period-indexed representations are the goal rather than
-general-purpose language modeling. The input-layer modification is orthogonal to
-the attention mechanism and could in principle be applied as an adapter on a
-pre-trained backbone, though the present work trains from scratch.
+The full Timeformer extends a standard Transformer with two components:
+token-time interaction at the input layer and causal prototype memory before
+the encoder. To isolate the role of each component, we compare it with a
+standard Transformer baseline and two intermediate ablations. The chain asks
+three questions: is a global epoch signal sufficient; does epoch information
+need to be bound to each token; and does causal subject history help beyond
+token-time interaction?
 
-To isolate which component drives traceability, we evaluate three progressive
-ablations against the full model. \textbf{Static} (standard Transformer, no
-temporal conditioning) is the null hypothesis. \textbf{Additive} adds a global
-time offset to all input embeddings. \textbf{Joint} replaces the offset with a
-joint token-time projection — Timeformer without the memory gate.
-Figure~\ref{fig:architecture} and Table~\ref{tab:model-variants} show all four
-configurations.
-
-All configurations share the same forward structure: a sentence is tokenized as
+All models share the same forward structure. A sentence is tokenized as
 \texttt{[CLS] S V O [SEP]}, each token \(w_i\) is mapped to an input embedding
-\(x_i \in \mathbb{R}^d\) (the only thing that differs across configurations),
-the sequence \((x_1,\ldots,x_n)\) is processed by the encoder, and the hidden
-state at the subject position defines
-\[
-  h_s = \mathrm{Enc}(x_1,\ldots,x_n)[s] \;\in\; \mathbb{R}^d,
-\]
-the \texttt{token@time} representation queried by all diagnostics.
+\(x_i \in \mathbb{R}^d\), the sequence \((x_1,\ldots,x_n)\) is processed by a
+Transformer encoder, and \(h_s = \mathrm{Enc}(x_1,\ldots,x_n)[s] \in
+\mathbb{R}^d\) is the \texttt{token@time} representation queried by all
+diagnostics. All models are trained with masked language modeling (MLM): a
+fraction of tokens are masked and the model is trained to reconstruct them
+from the remaining tokens and, when available, the epoch input. The input
+embedding \(x_i\) is the main point of variation across the chain.
+
+Additive, Joint, and Timeformer share a \emph{time representation}
+\(\tau(t) \in \mathbb{R}^d\): a learned projection of sinusoidal features of
+\(t/T\) into \(\mathbb{R}^d\), where \(T\) is the total number of training
+periods. This encodes the period index as a continuous, order-preserving
+vector, entirely distinct from the token-position encoding \(p_i\). Additive
+and Joint differ in how they combine \(\tau(t)\) with token identity; the full
+Timeformer then adds causal memory on top of Joint.
+Figure~\ref{fig:architecture} shows the baseline and ablation chain.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{outputs/figures/figure2_architecture_detail.png}
 \caption{Timeformer (rightmost column) and its three ablations.
 Each column activates one additional component (highlighted in yellow).
-\textbf{Static}: standard Transformer with no temporal signal — the null
+\textbf{Standard}: standard Transformer with no temporal signal — the null
 hypothesis. \textbf{Additive}: global time offset added to all embeddings.
 \textbf{Joint}: joint token-time projection — Timeformer without memory.
 \textbf{Timeformer}: full model, extending Joint with Prototype Memory and
@@ -260,104 +258,71 @@ Temporal Attention. Dashed grey boxes mark inactive components.}
 \label{fig:architecture}
 \end{figure}
 
-\begin{table}[t]
-\caption{Timeformer and its three ablations.}
-\label{tab:model-variants}
-\centering
-\footnotesize
-\renewcommand{\arraystretch}{0.88}
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{lp{3.2cm}p{3.0cm}p{1.8cm}}
-\toprule
-\textbf{Variant} & \textbf{Full name} & \textbf{Temporal signal} & \textbf{Memory} \\
-\midrule
-Static     & Static Transformer              & None                   & No \\
-Additive   & Additive Time-Conditioned       & Global time vector    & No \\
-Joint      & Token-Time Transformer          & Token-time interaction & No \\
-Timeformer & Memory-Augmented Timeformer     & Token-time interaction & Causal prototypes \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{Baseline: Static Transformer}
-Static is a standard pre-layer-normalized Transformer encoder with no temporal
-conditioning — it serves as the null hypothesis against which all ablations are
-compared. The input embedding combines a learned token embedding
-\(e(w_i) \in \mathbb{R}^d\) with a fixed sinusoidal position embedding
-\(p_i \in \mathbb{R}^d\):
-
-\[
-  x_i = e(w_i) + p_i .
-\]
-
-No period signal enters \(x_i\), so the sentence \texttt{S5 V2 O3} at \(t0\)
-and at \(t9\) produce identical sequences \((x_1,\ldots,x_n)\) and therefore
-the same \(h_s\). This is the null hypothesis for traceability.
-
-\subsection{Continuous Time Encoding}
-The Time input box (lower left of Figure~\ref{fig:architecture}) is shared by
-Additive, Joint, and Timeformer. Rather than a learned lookup table -- which would memorize
-training periods as unrelated identifiers -- a continuous encoding treats periods
-as ordered points on a shared scale, supporting interpolation and
-extrapolation. The period index \(t\) is normalized by the total number of
-training periods \(T\), passed through fixed sinusoidal features, and projected
-by a small multilayer perceptron (MLP):
-
-\[
-  \tau(t) = \mathrm{MLP}(\mathrm{sinusoidal}(t/T)).
-\]
-
-These features encode period index only and are entirely distinct from the
-token-position encodings \(p_i\) already present in the Transformer.
+\subsection{Baseline: Standard Transformer}
+The baseline is a plain Transformer encoder with no temporal conditioning.
+The input embedding \(x_i = e(w_i) + p_i\) combines a learned token
+embedding \(e(w_i) \in \mathbb{R}^d\) with a sinusoidal position encoding
+\(p_i \in \mathbb{R}^d\). No period signal enters \(x_i\), so
+\texttt{S5 V2 O3} at \(t0\) and at \(t9\) produce the same \(h_s\) —
+the null hypothesis for traceability.
 
 \subsection{Additive Time-Conditioned Transformer}
-The Additive variant routes \(\tau(t)\) from the Time input box directly
-into the input embedding by addition, without passing through the Token-Time
-Interaction box:
+Additive asks whether knowing the epoch is enough. It injects \(\tau(t)\)
+into every input embedding by addition:
 
 \[
   x_i = e(w_i) + p_i + \tau(t).
 \]
 
-Because the same \(\tau(t)\) is added to every token regardless of its
-identity, the subject, verb, and object all receive the same temporal offset.
-The model learns that a sentence belongs to period \(t\), but not that subject
-\texttt{S5} specifically has shifted meaning by \(t\). This variant isolates
-whether global period information alone is sufficient for traceability.
+The same \(\tau(t)\) is added to every token regardless of identity. The
+model receives the current period as a global signal, but epoch and token
+identity do not interact at the input layer — any token-specific temporal
+effect must emerge implicitly downstream. This isolates whether global period
+information alone is sufficient for traceability. For example, the subject
+embedding for \texttt{S5} in \texttt{S5 V2 O3} is
+\(e(\texttt{S5}) + p_1 + \tau(0)\) at \(t0\) and
+\(e(\texttt{S5}) + p_1 + \tau(9)\) at \(t9\), so the model can distinguish the
+two periods. However, the same change from \(\tau(0)\) to \(\tau(9)\) is also
+applied to \texttt{V2} and \texttt{O3}; the temporal signal is global rather
+than token-specific.
 
 \subsection{Token-Time Transformer}
-The Token-Time Transformer (Joint) activates the Token-Time Interaction box in
-Figure~\ref{fig:architecture}: the input embedding is computed by concatenating
-the token embedding and time encoding and projecting them jointly:
+Joint asks whether the epoch must be explicitly bound to each token before
+contextualization. It projects token identity and time jointly:
 
 \[
   x_i = W [e(w_i);\, \tau(t)] + p_i ,
 \]
 
 where \(e(w_i), \tau(t) \in \mathbb{R}^d\) and \(W \in \mathbb{R}^{d \times
-2d}\). The projection \(W\) sees token identity and time simultaneously, so
-the same period can affect different tokens differently. Concretely,
-\texttt{S5} at \(t0\) receives \(W[e(\texttt{S5});\,\tau(0)] + p_1\) while
-\texttt{S5} at \(t9\) receives \(W[e(\texttt{S5});\,\tau(9)] + p_1\): the
-initial embedding differs before any self-attention, giving the subject a
-distinct starting point at each period.
+2d}\). Unlike Additive, the temporal change is not a shared offset: it is
+computed after the projection sees both token identity and epoch. The same
+period can therefore affect different tokens differently. Concretely,
+\texttt{S5} at \(t0\) receives \(W[e(\texttt{S5});\,\tau(0)] + p_1\), while
+\texttt{S5} at \(t9\) receives \(W[e(\texttt{S5});\,\tau(9)] + p_1\). The
+subject embedding differs before any self-attention, so
+\(h_s(\texttt{S5},t0)\) and \(h_s(\texttt{S5},t9)\) can diverge in
+subject-specific directions.
 
 \subsection{Timeformer: Full Architecture}
-Timeformer extends Joint with the lower section of
-Figure~\ref{fig:architecture}: a Prototype Memory and Temporal Attention gate
-that update the subject embedding before it enters the encoder. For each
-subject \(s\) and period \(t\), prototype \(m(s,t)\) is the mean of \(s\)'s
-hidden states across all training sentences at that period. Prototypes are fixed
-during the forward pass (no gradients flow back through them) and served in
-causal order: at \(t_k\), the model attends only to \(\{m(s,t) : t < t_k\}\).
-For example, at \(t7\) the memory for \texttt{S5} is
-\(\{m(\texttt{S5},0),\ldots,m(\texttt{S5},6)\}\) -- a summary of how that
-subject has appeared in each of the seven preceding periods.
+Timeformer asks whether causal history helps beyond token-time interaction.
+It extends Joint with a Prototype Memory and Temporal Attention gate that
+update the subject embedding before it enters the encoder. In plain terms,
+temporal attention lets the current subject representation select which
+previous subject prototypes are most relevant to the current period.
+
+For each subject \(s\) and period \(t\), prototype \(m(s,t)\) is the mean of
+\(s\)'s hidden states across all training sentences at that period. Prototypes
+are fixed during the forward pass and served in causal order: at \(t_k\), the
+model attends only to \(\{m(s,t) : t < t_k\}\). For example, at \(t7\) the
+memory for \texttt{S5} is \(\{m(\texttt{S5},0),\ldots,m(\texttt{S5},6)\}\).
+Thus, for a current sentence containing \texttt{S5} at \(t7\), Timeformer first
+builds the Joint input embedding, then retrieves the available causal
+prototypes for \texttt{S5}, and finally injects a gated summary of that history
+into the current subject embedding before the encoder.
 
 Let \(x_s\) denote \(x_i\) at the subject position (computed by the Joint
-formula above). The cross-attention layer uses \(x_s\) as query and the
-historical prototypes as keys and values, producing an updated subject
-embedding:
+formula). The gate produces an updated subject embedding:
 
 \[
   \tilde{x}_s =
@@ -368,10 +333,11 @@ embedding:
 where \(M_s\) collects the causal prototypes for subject \(s\). The scalar
 gate \(g \in [0,1]\) is initialized to zero: when \(g=0\) the output equals
 \(x_s\) unchanged; when \(g=1\) it is the layer-normalized result of attending
-over past prototypes. The updated \(\tilde{x}_s\) replaces \(x_s\) in the
-input sequence before the encoder, so \(h_s = \mathrm{Enc}(\ldots,
-\tilde{x}_s, \ldots)[s]\). The model opens the memory channel only if it
-proves useful under the MLM objective.
+over past prototypes. The updated \(\tilde{x}_s\) replaces \(x_s\) before the
+encoder, so \(h_s = \mathrm{Enc}(\ldots, \tilde{x}_s, \ldots)[s]\). The gate
+opens the memory channel only if it proves useful under the MLM objective, so
+\(h_s\) at \(t_k\) is conditioned on the available causal prototype history
+\(\{m(\texttt{S5},0),\ldots,m(\texttt{S5},t_k{-}1)\}\).
 
 \section{Evaluation Protocol}
 % Target length: 1.25--1.5 pages.
@@ -405,7 +371,7 @@ same representation regardless of the period label provided. Fourth, we evaluate
 continuation examples from held-out later periods% TODO: specify which periods are held out (e.g. t8--t9)
 \ to test whether temporal behavior extends beyond the training distribution.
 
-Comparisons follow the ablation chain: Additive vs.\ Static isolates the effect of
+Comparisons follow the ablation chain: Additive vs.\ Standard isolates the effect of
 global time conditioning; Joint vs.\ Additive isolates token-time interaction; Timeformer
 vs.\ Joint isolates the memory contribution, evaluated on continuation and
 contrastive diagnostics.
@@ -422,15 +388,15 @@ and empty histories.
 We report results over three training runs. Unless otherwise noted, values are
 means over seeds, with the standard deviation shown in parentheses when space
 allows. The main finding is that token-time interaction produces a much
-clearer temporal movement in representation space than the Static Transformer.
+clearer temporal movement in representation space than the Standard Transformer.
 The memory-augmented variant is informative as a diagnostic extension, but it
 does not provide a robust improvement over the Token-Time Transformer.
 
 \subsection{Temporal Neighborhood Movement}
-% Main claim: Joint produces a stronger temporal neighborhood transition than Static.
+% Main claim: Joint produces a stronger temporal neighborhood transition than Standard.
 % Use class-specific curves to avoid claiming stable subjects are perfectly flat.
 Figure~\ref{fig:context-drift} and Table~\ref{tab:context-drift} show the
-context drift score across periods. For drifting subjects, the Static
+context drift score across periods. For drifting subjects, the Standard
 Transformer drops from \(0.618\) to \(0.387\) (\(\Delta=-0.231\)), while the
 Token-Time Transformer shows a much stronger transition from \(0.847\) to
 \(0.233\) (\(\Delta=-0.614\)). This is the clearest evidence for temporal
@@ -449,7 +415,7 @@ aggregate score.
 \includegraphics[width=\textwidth]{outputs/figures/figure3_context_drift.png}
 \caption{Context drift score across periods. The Token-Time Transformer shows
 stronger movement from $N_1$ toward $N_2$ for drifting subjects than
-the Static Transformer, while stable and bifurcating subjects provide
+the Standard Transformer, while stable and bifurcating subjects provide
 class-specific controls.}
 \label{fig:context-drift}
 \end{figure}
@@ -466,15 +432,15 @@ $N_1$ proportions among nearest neighbors; \(\Delta=t9-t0\).}
 \toprule
 \textbf{Class} & \textbf{Model} & \textbf{t0} & \textbf{t9} & \(\boldsymbol{\Delta}\) \\
 \midrule
-Stable & Static     & 0.736 & 0.756 & +0.020 \\
+Stable & Standard     & 0.736 & 0.756 & +0.020 \\
        & Joint      & 0.843 & 0.641 & -0.203 \\
        & Timeformer & 0.810 & 0.658 & -0.153 \\
 \midrule
-Drift  & Static     & 0.618 & 0.387 & -0.231 \\
+Drift  & Standard     & 0.618 & 0.387 & -0.231 \\
        & Joint      & 0.847 & 0.233 & -0.614 \\
        & Timeformer & 0.836 & 0.263 & -0.573 \\
 \midrule
-Bifurcation & Static     & 0.794 & 0.682 & -0.112 \\
+Bifurcation & Standard     & 0.794 & 0.682 & -0.112 \\
             & Joint      & 0.895 & 0.521 & -0.374 \\
             & Timeformer & 0.905 & 0.517 & -0.388 \\
 \bottomrule
@@ -484,7 +450,7 @@ Bifurcation & Static     & 0.794 & 0.682 & -0.112 \\
 \subsection{Probe and Contrastive Diagnostics}
 The linear probe results are supportive but less decisive than the neighborhood
 analysis. On the ambiguous split, where local verb and object markers are
-uninformative, the Static Transformer reaches \(0.577\) accuracy, the Additive
+uninformative, the Standard Transformer reaches \(0.577\) accuracy, the Additive
 Time-Conditioned Transformer reaches \(0.573\), and the Token-Time Transformer
 reaches \(0.599\). The corresponding mean delta for token-time interaction is
 \(+0.026\), but it is seed-sensitive: the three runs give \(+0.053\),
@@ -492,7 +458,7 @@ reaches \(0.599\). The corresponding mean delta for token-time interaction is
 carry the central claim. It measures recoverability of the planted label, not
 the geometry of temporal movement.
 
-The contrastive sign-flip diagnostic gives a different view. The Static
+The contrastive sign-flip diagnostic gives a different view. The Standard
 Transformer has a sign-flip rate of \(0.000\), as expected. The Additive
 variant averages \(0.690\) while the Token-Time Transformer averages \(0.517\),
 an ordering that may appear counterintuitive. The decoupling arises because
@@ -519,7 +485,7 @@ metric was not computed for this variant.% TODO: explain why Drift was not compu
 \toprule
 \textbf{Model} & \textbf{Drift} & \textbf{Flip} & \textbf{Ambig.} & \textbf{Cont.} \\
 \midrule
-Static     & -0.231 & 0.000 & 0.577 & 0.719 \\
+Standard   & -0.231 & 0.000 & 0.577 & 0.719 \\
 Additive   & --     & 0.690 & 0.573 & 0.754 \\
 Joint      & -0.614 & 0.517 & 0.599 & 0.766 \\
 Timeformer & -0.573 & 0.506 & 0.599 & 0.766 \\
@@ -566,7 +532,7 @@ The results support a clear conclusion: temporal traceability is a geometric
 property that does not reduce to predictive accuracy. The Token-Time Transformer
 improves probe accuracy by only \(+0.026\) on average (modest and
 seed-sensitive), yet shows a neighborhood drift of \(-0.614\) vs. \(-0.231\)
-for the static baseline. This dissociation is the central empirical finding: a
+for the Standard baseline. This dissociation is the central empirical finding: a
 model can use period information to improve predictions without exposing a
 representation in which the same lexical item occupies meaningfully different
 neighborhoods at different periods. Evaluating traceability therefore requires
@@ -595,12 +561,12 @@ direction from this work.
 This paper studied whether a Transformer-style encoder can expose a temporally traceable representation, meaning one in which the same lexical
 item, queried at different periods, occupies neighborhoods that reflect its
 intended temporal context. The answer, in the controlled benchmark used here, is conditional:
-explicit token-time interaction is necessary. A static encoder and a globally
+explicit token-time interaction is necessary. A Standard encoder and a globally
 time-conditioned encoder both fail to produce coherent subject-level
 trajectories. An encoder that conditions each token embedding on time
 before self-attention is applied does produce such trajectories, with a
 neighborhood drift for drifting subjects that is more than twice that of the
-static baseline (\(-0.614\) vs. \(-0.231\)).
+Standard baseline (\(-0.614\) vs. \(-0.231\)).
 
 The contribution is narrow and deliberate: token-time interaction supports
 traceability in a controlled diagnostic setting, not a claim about open-domain
