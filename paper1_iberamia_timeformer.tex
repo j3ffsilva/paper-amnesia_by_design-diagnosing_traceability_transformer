@@ -32,17 +32,16 @@ period-appropriate neighborhoods. A model may improve predictive accuracy with
 temporal information while still assigning nearly identical neighborhoods across
 periods; this gap is our focus.
 
-We introduce Timeformer and evaluate it through a controlled design chain. Two
-baselines bracket the design space: Standard (no temporal information) and
-Additive (global time vector, no token-time binding). Joint (token and time
-projected jointly before self-attention) is a direct ablation of Timeformer
-that removes only the memory component. The full Timeformer extends Joint with
-causal prototype memory. All models are trained with masked language modeling
-on a synthetic benchmark with known ground-truth trajectories.
+We introduce Timeformer as a family of token-time conditioning designs. Standard
+(no time) and Additive (global time vector) are external baselines. The
+Token-Time Transformer, labelled Joint, exposes token identity and period
+jointly before self-attention; a Memory-Augmented extension adds causal
+prototype memory. All models are trained with masked language modeling on a
+synthetic benchmark with known ground-truth trajectories.
 
-The main finding is that token-time interaction is the effective traceability
-mechanism. The Joint ablation produces a neighborhood drift of \(-0.614\) for
-drifting subjects, versus \(-0.231\) for Standard (stable across seeds).
+The main finding is that token-time conditioning is the effective traceability
+mechanism. Joint produces a neighborhood drift of \(-0.614\) for drifting
+subjects, versus \(-0.231\) for Standard (stable across seeds).
 Probe-based accuracy gains are modest and seed-sensitive, confirming that
 geometric diagnostics are more informative than label recoverability. The
 Memory-Augmented extension shows no robust improvement; oracle analysis identifies
@@ -85,74 +84,56 @@ Prediction accuracy and geometric traceability are separable properties.
 We call a representation \emph{temporally traceable} if the same surface token,
 queried at different periods, occupies neighborhoods consistent with its meaning
 at that period, making \texttt{token@time} a directly inspectable object. This
-paper introduces Timeformer and evaluates it through a controlled design chain.
-Standard (no time information) and Additive (global time vector) serve as
-baselines. Joint (token and time projected jointly before self-attention) is a
-direct ablation of the full model that removes only the memory component. The
-full Timeformer extends Joint with causal prototype memory. This chain isolates
-which form of temporal conditioning produces traceability. We study this in a controlled
-synthetic benchmark in which the temporal trajectory of each subject is known,
-giving diagnostic access to target neighborhoods without the confounds of natural
-historical corpora.
+paper introduces Timeformer as a token-time conditioning family evaluated
+against two external baselines: Standard (no time information) and Additive
+(global time vector). Joint exposes token identity and period jointly before
+self-attention, while a Memory-Augmented extension adds causal prototype memory.
+The comparison isolates which form of temporal conditioning produces
+traceability in a controlled synthetic benchmark where each subject trajectory
+is known.
 
 The paper makes four contributions: it formulates temporal traceability as a
-\texttt{token@time} representation problem; introduces the Timeformer design chain; evaluates traceability with diagnostics that inspect subject
-representations directly (context drift score, contrastive sign-flip rate,
-and probe-based evaluation); and shows that token-time interaction is the main
-positive mechanism, while mean-pooled historical memory is better understood as
-a diagnostic extension.
+\texttt{token@time} representation problem; identifies token-time conditioning
+as the effective mechanism; evaluates traceability with direct subject-level
+diagnostics; and shows that mean-pooled historical memory is better understood
+as a diagnostic extension than as a robust improvement.
 
 
 \section{Related Work}
-% Target length: 1.25--1.5 pages.
-Lexical semantic change detection (LSCD) is the dominant computational
-framing for studying how word meanings shift over time. Diachronic word
-embeddings~\cite{hamilton2016diachronic} made this operational by learning
-distributional representations for each time slice and measuring movement in
-embedding space after alignment across independently trained models. The central
-intuition — that change is visible as a shift in neighborhood structure — is
-shared by this paper. The gap, however, is architectural: LSCD methods produce
-a scalar summary of change between two separately trained spaces. They cannot
-support a \texttt{token@time} query, because the two spaces are not jointly
-parameterized and a token's representation in one has no direct geometric
-relationship to its representation in the other. Standardized LSCD
-benchmarks~\cite{schlechtweg2020semeval,tahmasebi2021survey} formalize this
-scalar-output task but inherit the observational complexity of natural corpora,
-where frequency shifts and genre composition confound genuine semantic change.
-We use a controlled benchmark with planted trajectories to isolate whether
-traceability emerges from architectural choices rather than corpus properties.
+% Target length: under 1 page.
+Lexical semantic change detection (LSCD) is the dominant computational framing
+for meaning shift. Diachronic word embeddings~\cite{hamilton2016diachronic}
+learn one distributional space per time slice, align independently trained
+models, and measure movement in neighborhood structure. We share the intuition
+that semantic change is geometric, but not the architecture: LSCD yields a
+scalar comparison between spaces rather than a jointly parameterized
+\texttt{token@time} representation. Standard benchmarks formalize this
+task~\cite{schlechtweg2020semeval,tahmasebi2021survey}, while also inheriting
+natural-corpus confounds such as frequency and genre drift. Our controlled
+benchmark plants trajectories so that traceability can be attributed to model
+design rather than corpus composition.
 
-A second line of work incorporates temporal information directly into a single
-neural model, avoiding separately trained spaces. Dhingra et al.\ evaluate a
-time-aware language model on knowledge-intensive QA; Rosin and Radinsky
-condition a masked language model on document timestamps; Loureiro et al.\
-train period-stratified language models and evaluate on downstream NLP
-tasks~\cite{dhingra2022timeaware,rosin2022timemasking,loureiro2022timelms}.
-These models show that temporal conditioning improves predictive accuracy on
-period-appropriate content. What none of them study is whether temporal
-conditioning produces \emph{geometrically} traceable representations: whether
-the same token at different periods occupies genuinely different neighborhoods
-in a shared space. Accurate period-conditioned predictions are compatible with
-nearly identical neighborhood structures across times — a dissociation our
-results confirm and that motivates the diagnostic framework in this paper.
+Temporal neural language models avoid separate spaces by conditioning one model
+on time. Prior work uses timestamps for knowledge-intensive QA, masked language
+modeling, or period-stratified downstream
+evaluation~\cite{dhingra2022timeaware,rosin2022timemasking,loureiro2022timelms}. These
+results show that temporal conditioning can improve period-appropriate
+prediction, but they do not test whether the same token occupies different
+neighborhoods at different periods in a shared space. That distinction matters:
+accurate time-conditioned predictions may coexist with nearly unchanged
+geometry, a dissociation our diagnostics make explicit.
 
-Linear probes are a common tool for testing whether information is encoded in
-neural representations. A probe trained to predict period labels from a token's
-hidden state measures recoverability — whether temporal information is linearly
-accessible — but does not establish that the same token occupies different
-neighborhoods at different periods. These are separable properties, and
-conflating them overstates what probe accuracy can show. We therefore treat
-probe accuracy as one diagnostic among several and rely on geometric measures
-of neighborhood movement as the primary evidence for traceability.
+Linear probes provide another partial view. A period probe measures whether time
+is recoverable from a hidden state, not whether a token has moved to a different
+semantic neighborhood. We therefore report probe accuracy as auxiliary evidence
+and treat neighborhood movement as the primary criterion for traceability.
 
-Finally, semantic change is not always a clean migration from one meaning to
-another. Giulianelli et al.\ show that words can develop two coexisting senses
-simultaneously, a process better described as bifurcation than
-drift~\cite{giulianelli2020analysing}. Mean-pooled representations collapse both
-senses into a centroid that faithfully represents neither. The three trajectory
-classes in our benchmark — stable, drifting, and bifurcating — are designed to
-test whether temporal conditioning handles this distinction, and the
-Memory-Augmented extension reveals precisely where mean-pooled prototypes fail.
+Finally, semantic change may involve bifurcation rather than monotonic drift.
+Giulianelli et al.\ show that words can develop coexisting
+senses~\cite{giulianelli2020analysing}; mean-pooled representations then collapse
+both senses into a centroid that represents neither. Our stable, drifting, and
+bifurcating trajectories test this distinction directly, and the memory
+extension exposes where mean-pooled prototypes fail.
 
 \section{Controlled Temporal Benchmark}
 % Target length: 1.0 page.
@@ -219,13 +200,10 @@ setting, not a claim about open-domain historical language.
 \section{Timeformer Architecture}
 % Target length: 2.0 pages.
 Timeformer is designed to make a subject representation depend explicitly on
-the period in which the subject is queried. The full model adds two mechanisms
-to a standard Transformer encoder. First, it binds token identity and period at
-the input layer. Second, it lets the current subject consult causal historical
-prototypes before the encoder. We introduce these mechanisms through a
-controlled design comparison: two baselines (Standard and Additive), one direct
-ablation (Token-Time Transformer, labelled Joint in
-Figure~\ref{fig:architecture}), and the full Timeformer.
+the queried period. We study this through a controlled comparison: Standard has
+no period input, Additive injects a global period vector, Joint exposes token
+identity and period jointly before self-attention, and the Memory-Augmented
+extension adds causal historical prototypes before the encoder.
 
 All models follow the same outer pipeline. A sentence is tokenized as
 \texttt{[CLS] S V O [SEP]}. Each token \(w_i\) is mapped to an input embedding
@@ -248,19 +226,19 @@ of \(t/T\), where \(T\) is the total number of training periods. In plain terms,
 \(\tau(t)\) is the vector representation of the current period. It is distinct
 from the position encoding \(p_i\), which only tells the Transformer whether a
 token is in subject, verb, or object position. Additive and Joint differ in how
-they combine \(\tau(t)\) with token identity; the full Timeformer then adds
-causal memory on top of Joint. Figure~\ref{fig:architecture} summarizes the
-comparison.
+they combine \(\tau(t)\) with token identity; the Memory-Augmented extension
+then adds causal memory on top of Joint. Figure~\ref{fig:architecture}
+summarizes the comparison.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{outputs/figures/figure2_architecture_detail.png}
 \caption{Controlled design comparison. \textbf{Standard}: Transformer baseline
 with no temporal signal. \textbf{Additive}: temporal baseline that adds the same
-period vector to every token. \textbf{Joint}: direct ablation of Timeformer
-without memory, using joint token-time projection. \textbf{Timeformer}: full
-model, extending Joint with Prototype Memory and Temporal Attention. New
-components are highlighted in yellow; dashed grey boxes mark inactive
+period vector to every token. \textbf{Joint}: Token-Time Transformer using joint
+token-time projection. \textbf{Memory-Augmented}: extension of Joint with
+Prototype Memory and Temporal Attention. New components are highlighted in
+yellow; dashed grey boxes mark inactive
 components.}
 \label{fig:architecture}
 \end{figure}
@@ -292,41 +270,35 @@ also applied to the verb and object: \texttt{V2} receives
 \(e(\texttt{O3})+p_3+\tau(t)\). Thus Additive tells the whole sentence which
 period it belongs to, but it does not explicitly bind period to each token's
 identity. If Additive succeeds, global period information is sufficient. If it
-does not, the next question is whether the period must interact with each token
-before contextualization.
+does not, the next question is whether period information must be exposed
+jointly with each token before contextualization.
 
-\subsection{Ablation: Token-Time Transformer}
-The Token-Time Transformer, labelled Joint in Figure~\ref{fig:architecture}, is
-the full Timeformer without the memory component. It asks whether explicit
-token-time interaction is enough. Instead of adding the same period vector to
-all tokens, Joint concatenates each token embedding with \(\tau(t)\) and
-projects the pair:
+\subsection{Token-Time Transformer}
+The Token-Time Transformer, labelled Joint in Figure~\ref{fig:architecture},
+asks whether exposing token identity and period jointly before self-attention is
+enough. Instead of adding the same period vector to all tokens, Joint
+concatenates each token embedding with \(\tau(t)\) and projects the pair:
 
 \[
   z_i = W [e(w_i);\, \tau(t)] + p_i ,
 \]
 
 where \(e(w_i), \tau(t) \in \mathbb{R}^d\) and \(W \in \mathbb{R}^{d \times
-2d}\). The difference from Additive is visible in the example. At \(t9\), the
-period vector is combined separately with \texttt{S5}, \texttt{V2}, and
-\texttt{O3}. The model computes \(W[e(\texttt{S5});\tau(9)]\),
-\(W[e(\texttt{V2});\tau(9)]\), and \(W[e(\texttt{O3});\tau(9)]\) as separate
-inputs. The same period can therefore affect the subject differently from the
-verb or object. For traceability, the key case is the subject:
-\texttt{S5} at \(t0\) receives \(W[e(\texttt{S5});\tau(0)] + p_1\), while
-\texttt{S5} at \(t9\) receives \(W[e(\texttt{S5});\tau(9)] + p_1\). The
-subject starts from an epoch-specific input before self-attention, making
-\(h_s(\texttt{S5},t0)\) and \(h_s(\texttt{S5},t9)\) free to move in different
-semantic directions.
+2d}\). A linear \(W\) does not by itself create nonlinear interaction; rather,
+it gives the encoder token-period inputs before self-attention, normalization,
+and later nonlinear transformations. For traceability, \texttt{S5} at \(t0\)
+and \texttt{S5} at \(t9\) therefore enter the encoder as distinct
+period-conditioned inputs, allowing later layers to form token-specific temporal
+effects.
 
-\subsection{Full Model: Timeformer}
-The full Timeformer asks whether causal history helps beyond token-time
-interaction. It starts exactly like Joint: for a current sentence containing
+\subsection{Memory-Augmented Extension}
+The Memory-Augmented extension asks whether causal history helps beyond token-time
+conditioning. It starts exactly like Joint: for a current sentence containing
 \texttt{S5} at \(t7\), the model first builds token-time input embeddings for
 \texttt{[CLS] S5 V O [SEP]}. It then modifies only the subject embedding before
 the Transformer encoder sees the sentence.
 
-The additional information comes from Prototype Memory. Timeformer stores one
+The additional information comes from Prototype Memory. The extension stores one
 prototype vector per subject and past period. A prototype \(m(s,t)\) is the
 average representation of subject \(s\) across training sentences from period
 \(t\). The memory is causal: at \(t7\), the model may consult
@@ -354,7 +326,7 @@ much this history summary should change the current subject embedding:
 \]
 
 Here, \(\mathrm{LN}\) denotes layer normalization, and \(g\) is a learned
-scalar gate initialized at zero so that Timeformer reduces to Joint at
+scalar gate initialized at zero so that the extension reduces to Joint at
 initialization. Finally, \(\tilde{z}_s\) replaces \(z_s\) in the input
 sequence; verb and object embeddings are unchanged, so the subject is the only
 token that enters the encoder informed by causal prototype history.
@@ -402,12 +374,12 @@ mapping generalizes beyond training. We evaluate on held-out periods
 direction of change, rather than memorizing period-specific patterns, should
 maintain coherent neighborhood assignments in these unseen periods.
 
-The four diagnostics are interpreted through a fixed ablation chain. Additive
+The four diagnostics are interpreted through a fixed comparison chain. Additive
 vs.\ Standard isolates the effect of adding any temporal signal. Joint
-vs.\ Additive tests whether that signal must interact with token identity
-(per-token gating) rather than being applied globally as a uniform shift.
-Timeformer vs.\ Joint tests the contribution of causal prototype memory, the
-mechanism most expected to affect D3 and D4.
+vs.\ Additive tests whether exposing token identity and period jointly before
+self-attention is more effective than applying the period globally as a uniform
+shift. Memory-Augmented vs.\ Joint tests the contribution of causal prototype
+memory, the mechanism most expected to affect D3 and D4.
 
 For the Memory-Augmented extension, we include three controls. In the
 \textit{shuffled-memory} control, each subject receives prototypes drawn from a
@@ -425,7 +397,7 @@ We report results over three training runs. Unless otherwise noted, values are
 means over seeds, with the standard deviation shown in parentheses when space
 allows. The main finding is that temporal conditioning produces a much
 clearer temporal movement in representation space than the Standard Transformer,
-with token-time interaction giving the strongest drifting-subject transition.
+with token-time conditioning giving the strongest drifting-subject transition.
 The Memory-Augmented extension is informative as a diagnostic, but it
 does not provide a robust improvement over the Token-Time Transformer.
 
@@ -433,14 +405,15 @@ does not provide a robust improvement over the Token-Time Transformer.
 % Main claim: temporal conditioning produces stronger neighborhood transitions than Standard.
 % Use class-specific curves to avoid claiming stable subjects are perfectly flat.
 Figure~\ref{fig:context-drift} and Table~\ref{tab:context-drift} show the
-context drift score across periods. For drifting subjects, the Standard
-Transformer drops from \(0.618\) to \(0.387\) (\(\Delta=-0.231\)). The Additive
-baseline shows a stronger transition (\(\Delta=-0.570\)), and the Token-Time
-Transformer strengthens it further, from \(0.847\) to \(0.233\)
-(\(\Delta=-0.614\)). The gap between the Token-Time Transformer and Standard
-is the primary geometric evidence for temporal traceability: token-time
-interaction causes the same subject to occupy substantially different
-neighborhoods at different periods.
+context drift score across periods. Standard is a sanity check against a
+corpus-only explanation: its weak movement shows that the benchmark alone does
+not induce the stronger trajectories observed when period information is
+available. For drifting subjects, Standard drops from \(0.618\) to \(0.387\)
+(\(\Delta=-0.231\)); Additive reaches \(\Delta=-0.570\); and the Token-Time
+Transformer strengthens the transition from \(0.847\) to \(0.233\)
+(\(\Delta=-0.614\)). The gap between Joint and Standard is the primary
+geometric evidence that token-time conditioning is associated with larger
+neighborhood movement for the same subject across periods.
 
 The class-specific curves serve as controls (Table~\ref{tab:context-drift}).
 Stable subjects show much smaller movement and no coherent $N_1$-to-$N_2$ trend.
@@ -474,17 +447,17 @@ $N_1$ proportions among nearest neighbors; \(\Delta=t9-t0\).}
 Stable & Standard     & 0.736 & 0.756 & +0.020 \\
        & Additive   & 0.790 & 0.658 & -0.132 \\
        & Joint      & 0.843 & 0.641 & -0.203 \\
-       & Timeformer & 0.810 & 0.658 & -0.153 \\
+       & Mem-Aug. & 0.810 & 0.658 & -0.153 \\
 \midrule
 Drift  & Standard     & 0.618 & 0.387 & -0.231 \\
        & Additive   & 0.847 & 0.278 & -0.570 \\
        & Joint      & 0.847 & 0.233 & -0.614 \\
-       & Timeformer & 0.836 & 0.263 & -0.573 \\
+       & Mem-Aug. & 0.836 & 0.263 & -0.573 \\
 \midrule
 Bifurcation & Standard     & 0.794 & 0.682 & -0.112 \\
             & Additive   & 0.913 & 0.531 & -0.382 \\
             & Joint      & 0.895 & 0.521 & -0.374 \\
-            & Timeformer & 0.905 & 0.517 & -0.388 \\
+            & Mem-Aug. & 0.905 & 0.517 & -0.388 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -495,7 +468,7 @@ but weaker evidence for, temporal traceability than the neighborhood analysis.
 On the ambiguous split, where local verb and object markers are uninformative,
 the Standard Transformer reaches \(0.577\) accuracy, the Additive baseline
 reaches \(0.573\), and the Token-Time Transformer reaches \(0.599\). The
-corresponding mean delta for token-time interaction is \(+0.026\), but it is
+corresponding mean delta for token-time conditioning is \(+0.026\), but it is
 seed-sensitive: the three runs give \(+0.053\), \(+0.005\), and \(+0.021\).
 Probe accuracy alone is insufficient to establish temporal traceability: it
 measures recoverability of the planted label, not the geometry of temporal
@@ -508,7 +481,7 @@ a counterintuitive ordering. The decoupling arises because sign-flip counts
 threshold crossings in individual contrastive pairs, whereas drift score
 measures the full trajectory magnitude. A global additive offset can move
 representations substantially and generate many threshold crossings, but it
-applies the same period signal to every token. Token-time interaction produces
+applies the same period signal to every token. Token-time conditioning produces
 a slightly stronger drifting-subject trajectory while making the period signal
 token-dependent; it does not necessarily cross the threshold in more individual
 contrastive pairs. The sign-flip rate confirms that both time-conditioned models
@@ -530,7 +503,7 @@ accuracy on \(h_s\); flip is contrastive sign-flip rate.}
 Standard   & -0.231 & 0.000 & 0.577 & 0.719 \\
 Additive   & -0.570 & 0.690 & 0.573 & 0.754 \\
 Joint      & -0.614 & 0.517 & 0.599 & 0.766 \\
-Timeformer & -0.573 & 0.506 & 0.599 & 0.766 \\
+Mem-Aug.   & -0.573 & 0.506 & 0.599 & 0.766 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -559,9 +532,9 @@ held-out periods \(t8\)--\(t9\); flip is the contrastive sign-flip rate (D3).}
 \toprule
 \textbf{Model} & \textbf{Cont.} & \textbf{Flip} & \textbf{$\Delta$ vs.\ Joint} \\
 \midrule
-Joint (reference)   & 0.762 & 0.448 & -- \\
-Timeformer learned  & 0.775 & 0.448 & +0.013 cont.; +0.000 flip \\
-Timeformer oracle   & 0.754 & 0.586 & $-$0.008 cont.; +0.138 flip \\
+Joint (reference) & 0.762 & 0.448 & -- \\
+Mem-Aug. learned  & 0.775 & 0.448 & +0.013 cont.; +0.000 flip \\
+Mem-Aug. oracle   & 0.754 & 0.586 & $-$0.008 cont.; +0.138 flip \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -572,10 +545,10 @@ This paper asked whether a Transformer-style encoder can expose a temporally
 traceable representation — one in which the same lexical item, queried at
 different periods, occupies neighborhoods that reflect its intended temporal
 context. The answer, in the controlled benchmark used here, is conditional:
-explicit token-time interaction is necessary. A Standard encoder and a globally
-time-conditioned encoder both fail to produce coherent subject-level
-trajectories. An encoder that conditions each token embedding on time before
-self-attention does produce such trajectories, with a neighborhood drift for
+explicit token-time conditioning is the most effective mechanism. A Standard
+encoder shows only weak movement, while temporally conditioned models produce
+substantially stronger subject-level trajectories. The Token-Time Transformer
+is strongest on the primary geometric diagnostic, with a neighborhood drift for
 drifting subjects more than twice that of the Standard baseline
 (\(-0.614\) vs.\ \(-0.231\)).
 
@@ -589,31 +562,40 @@ captures a distinct aspect of temporal traceability.
 
 This work explores a family of temporal conditioning designs of increasing
 complexity. In this benchmark, the Token-Time Transformer is the most effective
-instantiation: per-token conditioning allows the same period to affect different
-tokens differently, producing coherent subject-level trajectories where a global
-offset does not. The negative result for the Memory-Augmented extension is
-specific to mean-pooled prototypes in this controlled setting and should not be
-read as a general verdict on causal memory. The oracle diagnostic confirms this:
-perfect historical prototypes improve the contrastive sign-flip rate by
-\(+0.138\) over the Token-Time Transformer, showing the memory pathway is useful
-in principle. The failure of learned prototypes is a failure of aggregation: for
-bifurcating subjects, which develop two coexisting senses in later periods, the
-mean prototype is a centroid between two clusters, representing neither well.
+instantiation. Its advantage is interpretable as a consequence of the benchmark:
+subjects occupy a fixed position, the vocabulary is small, semantic change is
+concentrated in the subject token, and planted drift is clean. Under these
+conditions, exposing token identity and period jointly before self-attention
+gives later layers a clear target for token-specific temporal effects. Additive
+remains competitive and is stronger on contrastive sign flip, suggesting that a
+global period offset can move many pairs across a binary boundary even when
+Joint better captures aggregate neighborhood movement.
 
-Several limitations bound these conclusions. The benchmark is synthetic:
-subjects follow planted trajectories in a small controlled vocabulary, and
-results may not transfer directly to natural corpora with noisier or more
-gradual semantic change. The evaluation covers 30 subjects over three seeds,
-which is sufficient to establish direction but not to quantify effect sizes
-precisely. The MLM training objective optimizes token prediction rather than
-trajectory geometry, so traceability emerges as a side effect rather than a
-training target. Finally, the diagnostic suite was co-designed with the
-architecture family, which limits its role as an independent evaluation for
-models outside this design space.
+The negative result for the Memory-Augmented extension is specific to
+mean-pooled prototypes in this controlled setting and should not be read as a
+general verdict on causal memory. The oracle diagnostic confirms this: perfect
+historical prototypes improve the contrastive sign-flip rate by \(+0.138\) over
+the Token-Time Transformer, showing the memory pathway is useful in principle.
+The failure of learned prototypes is a failure of aggregation: for bifurcating
+subjects, which develop two coexisting senses in later periods, the mean
+prototype is a centroid between two clusters, representing neither well.
+
+Several limitations bound these conclusions. The advantage of Joint over
+Additive may depend on controlled positions, small vocabulary, and semantic
+change concentrated in a known lexical class; in larger corpora with diffuse
+change, less regular syntax, or imbalanced periods, it is not guaranteed. More
+generally, the benchmark is synthetic, so results should be read as mechanistic
+diagnostics rather than evidence of open-domain diachronic performance. The
+evaluation covers 30 subjects over three seeds, enough to establish direction
+but not precise effect sizes. The MLM objective optimizes token prediction
+rather than trajectory geometry, so traceability emerges as a side effect.
+Finally, the diagnostic suite was co-designed with the architecture family,
+limiting its role as an independent evaluation for models outside this design
+space.
 
 Designing memory mechanisms that preserve the internal structure of historical
 representations — rather than collapsing them to a single prototype — is the
-most direct next step. Evaluating token-time interaction on natural corpora with
+most direct next step. Evaluating token-time conditioning on natural corpora with
 attested semantic change is the necessary path toward claims beyond this
 controlled setting.
 
