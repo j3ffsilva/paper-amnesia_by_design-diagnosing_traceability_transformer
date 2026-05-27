@@ -81,7 +81,7 @@ def draw_svo_panel(ax: plt.Axes) -> None:
                 facecolor=bg,
                 edgecolor="#cccccc" if ci < 4 else "none",
                 linewidth=0.5,
-                alpha=0.42 if ci < 4 else 0.82,
+                alpha=0.65 if ci < 2 else (0.72 if ci < 4 else 0.82),
                 zorder=2,
             )
             ax.add_patch(rect)
@@ -114,7 +114,7 @@ def draw_trajectory_panel(ax: plt.Axes) -> None:
 
     ax.plot(t, _stable(t),  color=C_STABLE, linewidth=1.8, linestyle="--", label="Stable",       zorder=3)
     ax.plot(t, _drift(t),   color=C_A,      linewidth=1.8, linestyle="-",  label="Drift",        zorder=3)
-    ax.plot(t, _bifurc(t),  color=C_B,      linewidth=1.8, linestyle="-",  label="Bifurcation",  zorder=3)
+    ax.plot(t, _bifurc(t),  color=C_B,      linewidth=1.8, linestyle="-",  label="Bifurcating",  zorder=3)
 
     ax.axhline(0.5, color="#bbbbbb", linewidth=0.8, linestyle=":", zorder=1)
 
@@ -140,7 +140,7 @@ def draw_matrix_panel(ax: plt.Axes) -> None:
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")
-    ax.set_title("Expected representation state", fontsize=9, fontweight="bold", pad=6)
+    ax.set_title("Expected neighborhood", fontsize=9, fontweight="bold", pad=6)
 
     col_labels = ["t0", "t4", "t9"]
     row_labels  = ["Stable", "Drift", "Bifurc."]
@@ -149,7 +149,7 @@ def draw_matrix_panel(ax: plt.Axes) -> None:
     cells: list[list[tuple[str, str]]] = [
         [("N1",      C_A),   ("N1",      C_A),    ("N1",    C_A)],
         [("N1",      C_A),   ("~N1→N2",  C_TRANS), ("N2",   C_B)],
-        [("N1",      C_A),   ("N1",      C_A),    ("N1/N2", C_MIX)],
+        [("N1",      C_A),   ("~N1",     C_TRANS), ("N1/N2", C_MIX)],
     ]
 
     col_x = [0.38, 0.60, 0.82]
