@@ -41,11 +41,11 @@ causal prototype memory. All models are trained with masked language modeling
 on a synthetic benchmark with known ground-truth trajectories.
 
 The main finding is that token-time interaction is the effective traceability
-mechanism. The Joint variant produces a neighborhood drift of \(-0.614\) for
+mechanism. The Joint ablation produces a neighborhood drift of \(-0.614\) for
 drifting subjects, versus \(-0.231\) for Standard (stable across seeds).
 Probe-based accuracy gains are modest and seed-sensitive, confirming that
 geometric diagnostics are more informative than label recoverability. The
-Memory-Augmented variant shows no robust improvement; oracle analysis identifies
+Memory-Augmented extension shows no robust improvement; oracle analysis identifies
 mean-prototype aggregation as the failure point.
 
 \keywords{Temporal semantics \and Semantic change \and Transformer models \and Traceability \and Diagnostic evaluation}
@@ -150,7 +150,7 @@ Finally, this paper draws on diagnostic evaluation and multi-sense
 representations. Probe accuracy does not establish traceability, so we combine
 it with geometric diagnostics that inspect the subject token directly. Semantic
 change may involve bifurcation rather than a simple shift~\cite{giulianelli2020analysing};
-the memory-augmented variant exposes why mean-pooled prototypes are insufficient
+the Memory-Augmented extension exposes why mean-pooled prototypes are insufficient
 for that structure.
 
 \section{Controlled Temporal Benchmark}
@@ -369,54 +369,63 @@ causal prototype history.
 
 \section{Evaluation Protocol and Diagnostics}
 % Target length: 1.25--1.5 pages.
-All variants are trained with masked language modeling over the synthetic SVO
-corpus. The planted \texttt{true\_context} label is never used during training.
-It is used only after training, to test whether the subject representation
-reflects the planted temporal trajectory. The primary evaluation target is
-\(h_s\), the final hidden state at the subject position, because subjects are
-the lexical items whose meanings are designed to change, remain stable, or
-bifurcate over time.
+All models in the comparison chain are trained with masked language modeling
+over the synthetic SVO corpus. The planted \texttt{true\_context} label is
+withheld from training and used exclusively for post-hoc evaluation: it tests
+whether the learned subject representation reflects the planted temporal
+trajectory. The primary evaluation target is \(h_s\), the final hidden state
+at the subject position, because subjects are the lexical items whose meanings
+are designed to drift, remain stable, or bifurcate over time.
 
-We use four diagnostics, each answering a different question. The linear probe
-asks whether the planted context label can be recovered from \(h_s\). We train a
-linear classifier on \(h_s\) from the standard test split to predict
-\texttt{true\_context}, and then evaluate it on each split. This measures
-linear recoverability, but it does not show whether the representation follows
-the temporal trajectory.
+We use four diagnostics, each targeting a distinct aspect of temporal
+representation.
 
-The context drift score asks whether the neighborhood of a subject moves in the
-expected direction over time. For each period and subject class, we retrieve
-the \(k=10\) nearest neighbors of each subject representation by cosine
-similarity, excluding the query instance itself, and measure the proportion
-assigned to $N_1$. A traceable representation should show strong movement from
-$N_1$-like to $N_2$-like neighborhoods for drifting subjects, weaker movement
-for bifurcating subjects, and comparatively limited movement for stable
-subjects.
+\textbf{D1 -- Linear probe.} Asks whether \(h_s\) encodes the planted context
+label at all. We train a linear classifier on \(h_s\) from the standard test
+split to predict \texttt{true\_context} and evaluate it on each temporal split.
+High accuracy indicates that period-appropriate context is linearly separable in
+the representation, but does not reveal whether that separation shifts
+systematically over time.
 
-The contrastive diagnostic asks whether the same sentence changes when only the
-period label changes. We present the same subject token with two different
+\textbf{D2 -- Context drift score.} Asks whether the neighborhood of a subject
+shifts in the expected direction across periods. For each period and subject
+class, we retrieve the \(k=10\) nearest neighbors of \(h_s\) by cosine
+similarity (excluding the query itself) and record the proportion assigned to
+$N_1$. For drifting subjects, this proportion should decrease monotonically from
+$t0$ to $t7$; for stable subjects it should remain near its initial value; for
+bifurcating subjects it should decrease less steeply, as the representation
+splits between neighborhoods rather than migrating from one to the other.
+
+\textbf{D3 -- Contrastive diagnostic.} Asks whether the period label alone
+drives representational change. We present the same sentence with two different
 period labels and compute the sign-flip rate: the proportion of pairs for which
 swapping the period reverses the nearest-neighbor assignment, from
-$N_1$-dominant to $N_2$-dominant or vice versa. A model with no access to the
-period input should have sign-flip rate zero. Finally, the continuation
-diagnostic evaluates examples from held-out later periods \(t8\)--\(t9\), testing
-whether the learned time-dependent mapping extends beyond the periods used to
-train the MLM encoder.
+$N_1$-dominant to $N_2$-dominant or vice versa. A model that ignores the period
+input produces a sign-flip rate of zero; a model that responds to it produces a
+rate above zero.
 
-We interpret differences between adjacent models in the comparison chain.
-Additive vs.\ Standard tests the effect of global time conditioning. Joint
-vs.\ Additive tests whether the period signal must interact explicitly with
-token identity. Timeformer vs.\ Joint tests the contribution of causal memory,
-especially on continuation and contrastive diagnostics.
+\textbf{D4 -- Continuation diagnostic.} Asks whether the learned temporal
+mapping generalizes beyond training. We evaluate on held-out periods
+\(t8\)--\(t9\), excluded from MLM training. A model that has internalized the
+direction of change, rather than memorizing period-specific patterns, should
+maintain coherent neighborhood assignments in these unseen periods.
 
-For the memory-augmented model, we include three controls. In the
-shuffled-memory control, a subject receives prototypes from a different subject.
-In the no-history control, the memory path is present but empty. In the
-oracle-memory diagnostic, learned prototypes are replaced by fixed vectors
-encoding the true historical \(P(N_1 \mid s,t)\) trajectory available before
-the current period. We consider learned memory useful only if it improves over
-the Token-Time Transformer and also beats the shuffled-memory and no-history
-controls.
+The four diagnostics are interpreted through a fixed ablation chain. Additive
+vs.\ Standard isolates the effect of adding any temporal signal. Joint
+vs.\ Additive tests whether that signal must interact with token identity
+(per-token gating) rather than being applied globally as a uniform shift.
+Timeformer vs.\ Joint tests the contribution of causal prototype memory, the
+mechanism most expected to affect D3 and D4.
+
+For the Memory-Augmented extension, we include three controls. In the
+\textit{shuffled-memory} control, each subject receives prototypes drawn from a
+different subject, disrupting identity-specific history while preserving the
+memory pathway. In the \textit{no-history} control, the memory path is present
+but empty. In the \textit{oracle-memory} diagnostic, learned prototypes are
+replaced by fixed vectors encoding the true historical \(P(N_1 \mid s,t)\)
+trajectory. The extension passes the evaluation criterion if it outperforms both
+the Token-Time Transformer and the two controls; the oracle diagnostic then
+indicates how much headroom remains relative to a perfect memory signal.
 
 \section{Results}
 % Target length: 2.5--3.0 pages.
@@ -425,7 +434,7 @@ means over seeds, with the standard deviation shown in parentheses when space
 allows. The main finding is that temporal conditioning produces a much
 clearer temporal movement in representation space than the Standard Transformer,
 with token-time interaction giving the strongest drifting-subject transition.
-The memory-augmented variant is informative as a diagnostic extension, but it
+The Memory-Augmented extension is informative as a diagnostic, but it
 does not provide a robust improvement over the Token-Time Transformer.
 
 \subsection{Temporal Neighborhood Movement}
@@ -500,7 +509,7 @@ the geometry of temporal movement.
 
 The contrastive sign-flip diagnostic gives a different view. The Standard
 Transformer has a sign-flip rate of \(0.000\), as expected. The Additive
-variant averages \(0.690\) while the Token-Time Transformer averages \(0.517\),
+baseline averages \(0.690\) while the Token-Time Transformer averages \(0.517\),
 an ordering that may appear counterintuitive. The decoupling arises because
 sign-flip counts threshold crossings in individual contrastive pairs, whereas
 drift score measures the full trajectory magnitude. A global additive offset
@@ -576,7 +585,7 @@ representation in which the same lexical item occupies meaningfully different
 neighborhoods at different periods. Evaluating traceability therefore requires
 geometric diagnostics, not only label recoverability.
 
-The additive variant shows that knowing the period is not sufficient. A global
+The Additive baseline shows that knowing the period is not sufficient. A global
 additive offset shifts all token representations by the same vector, leaving
 subject-level trajectory geometry weakly constrained. Token-time interaction
 changes this: concatenating each token embedding with the time encoding before
