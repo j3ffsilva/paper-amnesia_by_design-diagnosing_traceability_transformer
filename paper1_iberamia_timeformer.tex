@@ -83,20 +83,16 @@ Prediction accuracy and geometric traceability are separable properties.
 
 We call a representation \emph{temporally traceable} if the same surface token,
 queried at different periods, occupies neighborhoods consistent with its meaning
-at that period, making \texttt{token@time} a directly inspectable object. This
-paper introduces Timeformer as a token-time conditioning family evaluated
-against two external baselines: Standard (no time information) and Additive
-(global time vector). Joint exposes token identity and period jointly before
-self-attention, while a Memory-Augmented extension adds causal prototype memory.
-The comparison isolates which form of temporal conditioning produces
-traceability in a controlled synthetic benchmark where each subject trajectory
-is known.
+at that period, making \texttt{token@time} a directly inspectable object.
+Timeformer evaluates this property across the conditioning family introduced
+above in a controlled synthetic benchmark where each subject trajectory is known.
 
 The paper makes four contributions: it formulates temporal traceability as a
-\texttt{token@time} representation problem; identifies token-time conditioning
-as the effective mechanism; evaluates traceability with direct subject-level
-diagnostics; and shows that mean-pooled historical memory is better understood
-as a diagnostic extension than as a robust improvement.
+\texttt{token@time} representation problem distinct from period-label
+recoverability; shows that token-time conditioning produces substantially
+larger neighborhood drift than both baselines; evaluates traceability with
+direct subject-level geometric diagnostics; and characterizes mean-pooled
+prototype memory as a diagnostic tool rather than a robust improvement.
 
 
 \section{Related Work}
@@ -119,9 +115,7 @@ modeling, or period-stratified downstream
 evaluation~\cite{dhingra2022timeaware,rosin2022timemasking,loureiro2022timelms}. These
 results show that temporal conditioning can improve period-appropriate
 prediction, but they do not test whether the same token occupies different
-neighborhoods at different periods in a shared space. That distinction matters:
-accurate time-conditioned predictions may coexist with nearly unchanged
-geometry, a dissociation our diagnostics make explicit.
+neighborhoods at different periods in a shared space.
 
 Linear probes provide another partial view. A period probe measures whether time
 is recoverable from a hidden state, not whether a token has moved to a different
@@ -244,15 +238,11 @@ components.}
 \end{figure}
 
 \subsection{Baseline: Standard Transformer}
-The Standard baseline asks whether temporal traceability appears without any
-period input. Its input embedding is the usual sum of a token embedding and a
-position encoding:
+Standard is the null hypothesis: no period signal is available, so any temporal
+behavior must arise from changes in the observed words alone.
 \[
   z_i = e(w_i) + p_i .
 \]
-Because no period signal enters the model, the same sentence at \(t0\) and
-\(t9\) produces identical \(h_s\). Standard is the null hypothesis: any
-temporal behavior must come only from changes in the observed words.
 
 \subsection{Baseline: Additive Time-Conditioned Transformer}
 The Additive baseline asks whether knowing the current period is enough. It
@@ -286,10 +276,8 @@ concatenates each token embedding with \(\tau(t)\) and projects the pair:
 where \(e(w_i), \tau(t) \in \mathbb{R}^d\) and \(W \in \mathbb{R}^{d \times
 2d}\). A linear \(W\) does not by itself create nonlinear interaction; rather,
 it gives the encoder token-period inputs before self-attention, normalization,
-and later nonlinear transformations. For traceability, \texttt{S5} at \(t0\)
-and \texttt{S5} at \(t9\) therefore enter the encoder as distinct
-period-conditioned inputs, allowing later layers to form token-specific temporal
-effects.
+and later nonlinear transformations. For traceability, \texttt{S5} at \(t0\) and \texttt{S5} at \(t9\) therefore
+enter the encoder as distinct period-conditioned inputs.
 
 \subsection{Memory-Augmented Extension}
 The Memory-Augmented extension asks whether causal history helps beyond token-time
@@ -405,15 +393,12 @@ does not provide a robust improvement over the Token-Time Transformer.
 % Main claim: temporal conditioning produces stronger neighborhood transitions than Standard.
 % Use class-specific curves to avoid claiming stable subjects are perfectly flat.
 Figure~\ref{fig:context-drift} and Table~\ref{tab:context-drift} show the
-context drift score across periods. Standard is a sanity check against a
-corpus-only explanation: its weak movement shows that the benchmark alone does
-not induce the stronger trajectories observed when period information is
-available. For drifting subjects, Standard drops from \(0.618\) to \(0.387\)
-(\(\Delta=-0.231\)); Additive reaches \(\Delta=-0.570\); and the Token-Time
-Transformer strengthens the transition from \(0.847\) to \(0.233\)
-(\(\Delta=-0.614\)). The gap between Joint and Standard is the primary
-geometric evidence that token-time conditioning is associated with larger
-neighborhood movement for the same subject across periods.
+context drift score across periods. Standard is a sanity check: its weak
+movement shows that the benchmark alone does not produce the stronger
+trajectories seen when period information is available. The gap between Joint
+and Standard for drifting subjects (Table~\ref{tab:context-drift}) is the
+primary geometric evidence that token-time conditioning produces larger
+neighborhood movement.
 
 The class-specific curves serve as controls (Table~\ref{tab:context-drift}).
 Stable subjects show much smaller movement and no coherent $N_1$-to-$N_2$ trend.
@@ -484,10 +469,7 @@ representations substantially and generate many threshold crossings, but it
 applies the same period signal to every token. Token-time conditioning produces
 a slightly stronger drifting-subject trajectory while making the period signal
 token-dependent; it does not necessarily cross the threshold in more individual
-contrastive pairs. The sign-flip rate confirms that both time-conditioned models
-respond to the period input; the neighborhood trajectory (D2) remains the more
-informative measure of how the geometry changes across periods.
-
+contrastive pairs. 
 \begin{table}[t]
 \caption{Main traceability diagnostics. Accuracy columns report linear-probe
 accuracy on \(h_s\); flip is contrastive sign-flip rate.}
@@ -541,24 +523,11 @@ Mem-Aug. oracle   & 0.754 & 0.586 & $-$0.008 cont.; +0.138 flip \\
 
 \section{Discussion and Conclusion}
 % Target length: 1.25--1.5 pages.
-This paper asked whether a Transformer-style encoder can expose a temporally
-traceable representation — one in which the same lexical item, queried at
-different periods, occupies neighborhoods that reflect its intended temporal
-context. The answer, in the controlled benchmark used here, is conditional:
-explicit token-time conditioning is the most effective mechanism. A Standard
-encoder shows only weak movement, while temporally conditioned models produce
-substantially stronger subject-level trajectories. The Token-Time Transformer
-is strongest on the primary geometric diagnostic, with a neighborhood drift for
-drifting subjects more than twice that of the Standard baseline
-(\(-0.614\) vs.\ \(-0.231\)).
-
-The central methodological lesson is that probe accuracy and neighborhood
-geometry measure different things. A model can use period information to improve
-predictions without producing a representation in which the same lexical item
-occupies meaningfully different neighborhoods at different periods. The
-evaluation protocol contributes a method for separating these two properties:
-geometric diagnostics are necessary alongside label recoverability, as each
-captures a distinct aspect of temporal traceability.
+In the controlled benchmark used here, explicit token-time conditioning is the
+most effective mechanism for temporal traceability. The Token-Time Transformer
+produces neighborhood drift for drifting subjects more than twice that of the
+Standard baseline (\(-0.614\) vs.\ \(-0.231\)), while the Standard encoder
+shows only weak movement.
 
 This work explores a family of temporal conditioning designs of increasing
 complexity. In this benchmark, the Token-Time Transformer is the most effective
