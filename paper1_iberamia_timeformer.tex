@@ -350,9 +350,10 @@ We use four diagnostics, each targeting a distinct aspect of temporal
 representation.
 
 \textbf{D1 -- Linear probe~\cite{conneau2018probing}.} Asks whether \(h_s\)
-encodes the planted context label at all. We train a linear classifier on
-\(h_s\) from the standard test split to predict \texttt{true\_context} and
-evaluate it on each temporal split. High accuracy indicates that
+encodes the planted context label at all. The encoder is frozen; a linear
+classifier is trained on \(h_s\) representations extracted from the held-out
+test sentences of the standard (75\%-fidelity) split and evaluated on the
+ambiguous and continuation splits. High accuracy indicates that
 period-appropriate context is linearly separable in the representation, but
 does not reveal whether that separation shifts systematically over time.
 
@@ -389,15 +390,13 @@ self-attention is more effective than applying the period globally as a uniform
 shift. Memory-Augmented vs.\ Token-Time tests the contribution of causal prototype
 memory, the mechanism most expected to affect D3 and D4.
 
-For the Memory-Augmented extension, we include three controls. In the
-\textit{shuffled-memory} control, each subject receives prototypes drawn from a
-different subject, disrupting identity-specific history while preserving the
-memory pathway. In the \textit{no-history} control, the memory path is present
-but empty. In the \textit{oracle-memory} diagnostic, learned prototypes are
-replaced by fixed vectors encoding the true historical \(P(N_1 \mid s,t)\)
-trajectory. The extension passes the evaluation criterion if it outperforms both
-the Token-Time Transformer and the two controls; the oracle diagnostic then
-indicates how much headroom remains relative to a perfect memory signal.
+For the Memory-Augmented extension, we include an \textit{oracle-memory}
+diagnostic: learned prototypes are replaced by fixed vectors encoding the true
+historical \(P(N_1 \mid s,t)\) trajectory, with the rest of the architecture
+unchanged. This isolates whether the failure of learned prototypes is due to the
+memory pathway itself or to the aggregation mechanism; improvement under oracle
+prototypes indicates that the pathway is functional but the aggregation is the
+bottleneck.
 
 \section{Results}
 % Target length: 2.5--3.0 pages.
@@ -406,6 +405,16 @@ finding is that any temporal conditioning produces substantially larger
 neighborhood drift than no conditioning; Additive and Token-Time are not robustly
 distinguishable on drift score. The Memory-Augmented extension does not provide
 a robust improvement over the Token-Time Transformer.
+
+\paragraph{Implementation details.}
+All models share the same Transformer encoder: \(d=64\), 4 attention heads, 2
+layers, feed-forward width 128, dropout 0.1. The period encoding projects 32
+sinusoidal features of \(t/T\) to \(d\) via a two-layer MLP. Training uses
+AdamW (lr \(=10^{-3}\), weight decay \(=10^{-2}\)) with a cosine annealing
+schedule, 30 epochs, batch size 64. The corpus contains 5{,}000 SVO sentences;
+MLM training uses 3{,}159 sentences from periods \(t0\)--\(t7\); 763 sentences
+from the same periods form the held-out evaluation set; 794 sentences from
+\(t8\)--\(t9\) are reserved for the continuation diagnostic.
 
 \subsection{Temporal Neighborhood Movement}
 % Main claim: temporal conditioning produces stronger neighborhood transitions than Standard.
@@ -538,7 +547,7 @@ accuracy on held-out periods \(t8\)--\(t9\); Flip: contrastive sign-flip rate
 \textbf{Model} & \textbf{Cont.} & \textbf{Flip} & \textbf{$\Delta$ cont.\ vs.\ Token-Time} \\
 \midrule
 Token-Time (ref.)  & 0.763 [$\pm$0.004] & 0.624 [$\pm$0.048] & -- \\
-Mem-Aug.\ learned  & 0.755 [$\pm$0.005] & 0.587 [$\pm$0.051] & $-$0.008 \\
+Mem-Aug.\ learned  & 0.755 [$\pm$0.005] & 0.587 [$\pm$0.051] & $-$0.008 [$\pm$0.006] \\
 Mem-Aug.\ oracle   & 0.769 [$\pm$0.004] & 0.694 [$\pm$0.059] & $+$0.007 [$\pm$0.007] \\
 \bottomrule
 \end{tabular}
