@@ -204,8 +204,8 @@ fidelity to 50\%, so local markers carry no reliable signal; only subject
 identity and period remain. Two additional conditions test temporal behaviour
 directly and are described in Section~5: the contrastive set presents the same
 sentence under two different period labels to check whether changing only the
-period changes the preferred context; the continuation set uses periods held out from training to test
-generalisation.
+period changes the preferred context; the continuation set uses periods \(t8\)--\(t9\), held out from MLM training
+(which covers \(t0\)--\(t7\)), to test generalisation.
 
 \section{Timeformer Architecture}
 % Target length: 2.0 pages.
@@ -522,7 +522,7 @@ Ambig./Cont.: linear-probe accuracy on \(h_s\). 95\% CI in brackets.}
 \midrule
 Standard & $-$0.221 [$\pm$0.018] & 0.000 & 0.565 [$\pm$0.004] & 0.730 [$\pm$0.004] \\
 Additive & $-$0.567 [$\pm$0.019] & 0.602 [$\pm$0.053] & 0.579 [$\pm$0.005] & 0.763 [$\pm$0.003] \\
-Token-Time    & $-$0.563 [$\pm$0.020] & 0.624 [$\pm$0.049] & 0.595 [$\pm$0.006] & 0.763 [$\pm$0.004] \\
+Token-Time    & $-$0.563 [$\pm$0.020] & 0.624 [$\pm$0.048] & 0.595 [$\pm$0.006] & 0.763 [$\pm$0.004] \\
 Mem-Aug. & $-$0.559 [$\pm$0.022] & 0.587 [$\pm$0.051] & 0.598 [$\pm$0.008] & 0.755 [$\pm$0.005] \\
 \bottomrule
 \end{tabular}
