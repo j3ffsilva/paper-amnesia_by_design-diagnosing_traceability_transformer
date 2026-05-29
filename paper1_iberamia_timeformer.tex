@@ -34,16 +34,16 @@ periods; this gap is our focus.
 
 We introduce Timeformer as a family of token-time conditioning designs. Standard
 (no time) and Additive (global time vector) are external baselines. The
-Token-Time Transformer, labelled Joint, exposes token identity and period
-jointly before self-attention; a Memory-Augmented extension adds causal
+Token-Time Transformer exposes token identity and period jointly before
+self-attention; a Memory-Augmented extension adds causal
 prototype memory. All models are trained with masked language modeling on a
 synthetic benchmark with known ground-truth trajectories.
 
 The main finding is that temporal conditioning of any form produces substantially
 larger neighborhood drift than no conditioning: conditioned models reach
 \(\Delta \approx -0.56\) for drifting subjects versus \(-0.22\) for Standard,
-stable across 31 seeds. Additive and Joint are statistically indistinguishable
-on drift score; Joint shows a reproducible advantage only on the more sensitive
+stable across 31 seeds. Additive and Token-Time are statistically indistinguishable
+on drift score; Token-Time shows a reproducible advantage only on the more sensitive
 ambiguous probe diagnostic (\(0.595\) vs. \(0.579\)). The Memory-Augmented
 extension shows no robust improvement; oracle analysis identifies mean-prototype
 aggregation as the failure point.
@@ -92,7 +92,7 @@ The paper makes four contributions: it formulates temporal traceability as a
 \texttt{token@time} representation problem distinct from period-label
 recoverability; shows that temporal conditioning of any form produces
 substantially larger neighborhood drift than no conditioning, while Additive
-and Joint are not robustly distinguishable on drift score; evaluates traceability
+and Token-Time are not robustly distinguishable on drift score; evaluates traceability
 with direct subject-level geometric diagnostics; and characterizes mean-pooled
 prototype memory as a diagnostic tool rather than a robust improvement.
 
@@ -205,7 +205,7 @@ generalisation.
 % Target length: 2.0 pages.
 Timeformer is designed to make a subject representation depend explicitly on
 the queried period. We study this through a controlled comparison: Standard has
-no period input, Additive injects a global period vector, Joint exposes token
+no period input, Additive injects a global period vector, Token-Time exposes token
 identity and period jointly before self-attention, and the Memory-Augmented
 extension adds causal historical prototypes before the encoder.
 
@@ -229,9 +229,9 @@ The temporally informed models use a shared period vector
 of \(t/T\), where \(T\) is the total number of training periods. In plain terms,
 \(\tau(t)\) is the vector representation of the current period. It is distinct
 from the position encoding \(p_i\), which only tells the Transformer whether a
-token is in subject, verb, or object position. Additive and Joint differ in how
+token is in subject, verb, or object position. Additive and Token-Time differ in how
 they combine \(\tau(t)\) with token identity; the Memory-Augmented extension
-then adds causal memory on top of Joint. Figure~\ref{fig:architecture}
+then adds causal memory on top of Token-Time. Figure~\ref{fig:architecture}
 summarizes the comparison.
 
 \begin{figure}[t]
@@ -239,8 +239,8 @@ summarizes the comparison.
 \includegraphics[width=\textwidth]{outputs/figures/figure2_architecture_detail.png}
 \caption{Controlled design comparison. \textbf{Standard}: Transformer baseline
 with no temporal signal. \textbf{Additive}: temporal baseline that adds the same
-period vector to every token. \textbf{Joint}: Token-Time Transformer using joint
-token-time projection. \textbf{Memory-Augmented}: extension of Joint with
+period vector to every token. \textbf{Token-Time}: Token-Time Transformer using joint
+token-time projection. \textbf{Memory-Augmented}: extension of Token-Time with
 Prototype Memory and Temporal Attention. New components are highlighted in
 yellow; dashed grey boxes mark inactive
 components.}
@@ -274,9 +274,9 @@ does not, the next question is whether period information must be exposed
 jointly with each token before contextualization.
 
 \subsection{Token-Time Transformer}
-The Token-Time Transformer, labelled Joint in Figure~\ref{fig:architecture},
+The Token-Time Transformer in Figure~\ref{fig:architecture}
 asks whether exposing token identity and period jointly before self-attention is
-enough. Instead of adding the same period vector to all tokens, Joint
+enough. Instead of adding the same period vector to all tokens, Token-Time
 concatenates each token embedding with \(\tau(t)\) and projects the pair:
 
 \[
@@ -291,7 +291,7 @@ enter the encoder as distinct period-conditioned inputs.
 
 \subsection{Memory-Augmented Extension}
 The Memory-Augmented extension asks whether causal history helps beyond token-time
-conditioning. It starts exactly like Joint: for a current sentence containing
+conditioning. It starts exactly like Token-Time: for a current sentence containing
 \texttt{S5} at \(t7\), the model first builds token-time input embeddings for
 \texttt{[CLS] S5 V O [SEP]}. It then modifies only the subject embedding before
 the Transformer encoder sees the sentence.
@@ -304,7 +304,7 @@ average representation of subject \(s\) across training sentences from period
 \(t7\) or later.
 
 Temporal attention turns this list of past prototypes into a history summary
-for the current subject. Let \(z_s\) be the current Joint subject embedding and
+for the current subject. Let \(z_s\) be the current Token-Time subject embedding and
 let \(M_s\) be the matrix of available causal prototypes, one row per past
 period. The attention operation uses \(z_s\) as the query and \(M_s\) as keys
 and values:
@@ -324,7 +324,7 @@ much this history summary should change the current subject embedding:
 \]
 
 Here, \(\mathrm{LN}\) denotes layer normalization, and \(g\) is a learned
-scalar gate initialized at zero so that the extension reduces to Joint at
+scalar gate initialized at zero so that the extension reduces to Token-Time at
 initialization. Finally, \(\tilde{z}_s\) replaces \(z_s\) in the input
 sequence; verb and object embeddings are unchanged, so the subject is the only
 token that enters the encoder informed by causal prototype history.
@@ -376,10 +376,10 @@ direction of change, rather than memorizing period-specific patterns, should
 maintain coherent neighborhood assignments in these unseen periods.
 
 The four diagnostics are interpreted through a fixed comparison chain. Additive
-vs.\ Standard isolates the effect of adding any temporal signal. Joint
+vs.\ Standard isolates the effect of adding any temporal signal. Token-Time
 vs.\ Additive tests whether exposing token identity and period jointly before
 self-attention is more effective than applying the period globally as a uniform
-shift. Memory-Augmented vs.\ Joint tests the contribution of causal prototype
+shift. Memory-Augmented vs.\ Token-Time tests the contribution of causal prototype
 memory, the mechanism most expected to affect D3 and D4.
 
 For the Memory-Augmented extension, we include three controls. In the
@@ -396,7 +396,7 @@ indicates how much headroom remains relative to a perfect memory signal.
 % Target length: 2.5--3.0 pages.
 We report means and 95\% confidence intervals over 31 training seeds. The main
 finding is that any temporal conditioning produces substantially larger
-neighborhood drift than no conditioning; Additive and Joint are not robustly
+neighborhood drift than no conditioning; Additive and Token-Time are not robustly
 distinguishable on drift score. The Memory-Augmented extension does not provide
 a robust improvement over the Token-Time Transformer.
 
@@ -424,7 +424,7 @@ alone.
 \includegraphics[width=\textwidth]{outputs/figures/figure3_context_drift.png}
 \caption{Context drift score across periods. All conditioned models move drifting
 subjects from $N_1$ toward $N_2$ substantially more than Standard; Additive,
-Joint, and Memory-Augmented produce similar trajectories. Stable and bifurcating
+Token-Time, and Memory-Augmented produce similar trajectories. Stable and bifurcating
 subjects provide class-specific controls.}
 \label{fig:context-drift}
 \end{figure}
@@ -443,17 +443,17 @@ over 31 seeds; \(\Delta=t9-t0\); 95\% CI half-widths in brackets.}
 \midrule
 Stable & Standard & 0.741 & 0.781 & $+$0.040 [$\pm$0.017] \\
        & Additive & 0.827 & 0.678 & $-$0.150 [$\pm$0.027] \\
-       & Joint    & 0.835 & 0.655 & $-$0.180 [$\pm$0.024] \\
+       & Token-Time    & 0.835 & 0.655 & $-$0.180 [$\pm$0.024] \\
        & Mem-Aug. & 0.830 & 0.672 & $-$0.158 [$\pm$0.021] \\
 \midrule
 Drift  & Standard & 0.632 & 0.410 & $-$0.221 [$\pm$0.018] \\
        & Additive & 0.839 & 0.272 & $-$0.567 [$\pm$0.019] \\
-       & Joint    & 0.833 & 0.269 & $-$0.563 [$\pm$0.020] \\
+       & Token-Time    & 0.833 & 0.269 & $-$0.563 [$\pm$0.020] \\
        & Mem-Aug. & 0.833 & 0.274 & $-$0.559 [$\pm$0.022] \\
 \midrule
 Bifurc. & Standard & 0.793 & 0.660 & $-$0.133 [$\pm$0.018] \\
         & Additive & 0.895 & 0.530 & $-$0.365 [$\pm$0.017] \\
-        & Joint    & 0.891 & 0.525 & $-$0.366 [$\pm$0.016] \\
+        & Token-Time    & 0.891 & 0.525 & $-$0.366 [$\pm$0.016] \\
         & Mem-Aug. & 0.878 & 0.530 & $-$0.348 [$\pm$0.015] \\
 \bottomrule
 \end{tabular}
@@ -463,8 +463,8 @@ Bifurc. & Standard & 0.793 & 0.660 & $-$0.133 [$\pm$0.018] \\
 The linear probe results reveal a distinction that drift score does not. On the
 ambiguous split, where local verb and object markers are uninformative, Standard
 reaches \(0.565\) \([0.561, 0.568]\), Additive \(0.579\) \([0.575, 0.584]\),
-Joint \(0.595\) \([0.589, 0.601]\), and Memory-Augmented \(0.598\)
-\([0.590, 0.606]\). The confidence intervals for Additive and Joint do not
+Token-Time \(0.595\) \([0.589, 0.601]\), and Memory-Augmented \(0.598\)
+\([0.590, 0.606]\). The confidence intervals for Additive and Token-Time do not
 overlap, showing a reproducible advantage for joint token-time conditioning on
 this more sensitive diagnostic even when drift scores are statistically
 indistinguishable. Probe accuracy alone is insufficient to establish temporal
@@ -473,7 +473,7 @@ geometry — but it captures a different aspect of how temporal information is
 encoded.
 
 The contrastive sign-flip rates are similar across conditioned models: Standard
-\(0.000\), Additive \(0.602\) \([0.549, 0.655]\), Joint \(0.624\)
+\(0.000\), Additive \(0.602\) \([0.549, 0.655]\), Token-Time \(0.624\)
 \([0.576, 0.673]\), Memory-Augmented \(0.587\) \([0.536, 0.638]\). Confidence
 intervals overlap, confirming that all conditioned models respond to period
 information at roughly the same rate in contrastive pairs. 
@@ -492,17 +492,17 @@ Ambig./Cont.: linear-probe accuracy on \(h_s\). 95\% CI in brackets.}
 \midrule
 Standard & $-$0.221 [$\pm$0.018] & 0.000 & 0.565 [$\pm$0.004] & 0.730 [$\pm$0.004] \\
 Additive & $-$0.567 [$\pm$0.019] & 0.602 [$\pm$0.053] & 0.579 [$\pm$0.005] & 0.763 [$\pm$0.003] \\
-Joint    & $-$0.563 [$\pm$0.020] & 0.624 [$\pm$0.049] & 0.595 [$\pm$0.006] & 0.763 [$\pm$0.004] \\
+Token-Time    & $-$0.563 [$\pm$0.020] & 0.624 [$\pm$0.049] & 0.595 [$\pm$0.006] & 0.763 [$\pm$0.004] \\
 Mem-Aug. & $-$0.559 [$\pm$0.022] & 0.587 [$\pm$0.051] & 0.598 [$\pm$0.008] & 0.755 [$\pm$0.005] \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \subsection{Memory Diagnostics}
-% Report Timeformer honestly: not a stable improvement over Joint, but diagnostically
+% Report Timeformer honestly: not a stable improvement over Token-Time, but diagnostically
 % useful. Oracle memory may affect sign flip without solving continuation.
 The Memory-Augmented Timeformer does not produce a robust gain over the
-Token-Time Transformer. On continuation, Joint averages \(0.763\)
+Token-Time Transformer. On continuation, Token-Time averages \(0.763\)
 \([0.759, 0.766]\) and Memory-Augmented \(0.755\) \([0.750, 0.760]\) across
 31 seeds; the delta is small and in the negative direction. The
 oracle diagnostic clarifies the failure mode: oracle memory improves contrastive
@@ -524,9 +524,9 @@ held-out periods \(t8\)--\(t9\); flip is the contrastive sign-flip rate (D3).}
 \setlength{\tabcolsep}{5pt}
 \begin{tabular}{lccp{2.8cm}}
 \toprule
-\textbf{Model} & \textbf{Cont.} & \textbf{Flip} & \textbf{$\Delta$ vs.\ Joint} \\
+\textbf{Model} & \textbf{Cont.} & \textbf{Flip} & \textbf{$\Delta$ vs.\ Token-Time} \\
 \midrule
-Joint (reference) & 0.762 & 0.448 & -- \\
+Token-Time (reference) & 0.762 & 0.448 & -- \\
 Mem-Aug. learned  & 0.775 & 0.448 & +0.013 cont.; +0.000 flip \\
 Mem-Aug. oracle   & 0.754 & 0.586 & $-$0.008 cont.; +0.138 flip \\
 \bottomrule
@@ -543,7 +543,7 @@ cluster near \(\Delta\approx-0.563\) with overlapping 95\% confidence intervals,
 stable across 31 seeds. This is the main geometric result.
 
 At the second level, the form of conditioning matters less than its presence.
-Additive and Joint are statistically indistinguishable on drift score; Joint
+Additive and Token-Time are statistically indistinguishable on drift score; Token-Time
 shows a reproducible advantage only on the ambiguous probe (\(0.595\) vs.\
 \(0.579\), non-overlapping CIs), suggesting that joint token-time conditioning
 encodes temporal information more precisely in the subject representation, even
@@ -561,7 +561,7 @@ The failure of learned prototypes is a failure of aggregation: for bifurcating
 subjects, which develop two coexisting senses in later periods, the mean
 prototype is a centroid between two clusters, representing neither well.
 
-Several limitations bound these conclusions. The probe-level advantage of Joint
+Several limitations bound these conclusions. The probe-level advantage of Token-Time
 over Additive is small and may not generalize beyond controlled positions, small
 vocabulary, and semantic change concentrated in a known lexical class; it does
 not appear on the drift score at all.
