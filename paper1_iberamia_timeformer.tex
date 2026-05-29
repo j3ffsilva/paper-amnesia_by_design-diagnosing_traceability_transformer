@@ -429,11 +429,17 @@ between any conditioned model and Standard is the primary geometric evidence
 for the effect of temporal conditioning.
 
 The class-specific curves serve as controls (Table~\ref{tab:context-drift}).
-Stable subjects show much smaller movement and no coherent $N_1$-to-$N_2$ trend.
-Bifurcating subjects show intermediate drift consistent with a trajectory
-toward a mixed state, not a complete transition. The geometric diagnostic
-distinguishes all three trajectory classes without relying on probe accuracy
-alone.
+Stable subjects show smaller movement in absolute magnitude (\(\Delta\) between
+\(-0.150\) and \(-0.180\) for conditioned models, versus \(\Delta \approx -0.56\)
+for drifting subjects), but the direction is consistently negative. This reflects
+a global displacement of the embedding space induced by the period vector: even
+subjects with flat planted trajectories are pulled along the learned temporal
+direction, at substantially reduced magnitude. Bifurcating subjects show
+intermediate drift: conditioned models reach \(t9\) values near \(0.53\),
+consistent with the planted endpoint \(P(N_1 \mid s, t9) \approx 0.5\) for the
+mixed state, confirming that the benchmark's bifurcating trajectory is partially
+recovered but not fully resolved. The geometric diagnostic distinguishes all
+three trajectory classes without relying on probe accuracy alone.
 
 \begin{figure}[t]
 \centering
@@ -476,17 +482,25 @@ Bifurc. & Standard & 0.793 & 0.660 & $-$0.133 [$\pm$0.018] \\
 \end{table}
 
 \subsection{Probe and Contrastive Diagnostics}
-The linear probe results reveal a distinction that drift score does not. On the
-ambiguous split, where local verb and object markers are uninformative, Standard
+The linear probe results reveal a distinction that drift score does not.
+On the standard (75\%-fidelity) split, where local markers carry reliable
+context signal, all conditioned models outperform Standard
+(\(0.875\) [\(\pm\)0.005]): Additive reaches \(0.892\) [\(\pm\)0.003],
+Token-Time \(0.881\) [\(\pm\)0.005], and Mem-Aug.\ \(0.881\) [\(\pm\)0.006];
+on this split Additive is above Token-Time. The ordering reverses on the
+ambiguous split, where local verb and object markers are uninformative: Standard
 reaches \(0.565\) \([0.561, 0.568]\), Additive \(0.579\) \([0.575, 0.584]\),
 Token-Time \(0.595\) \([0.589, 0.601]\), and Memory-Augmented \(0.598\)
 \([0.590, 0.606]\). The confidence intervals for Additive and Token-Time do not
-overlap, showing a reproducible advantage for joint token-time conditioning on
-this more sensitive diagnostic even when drift scores are statistically
-indistinguishable. Probe accuracy alone is insufficient to establish temporal
-traceability — it measures recoverability of the planted label, not neighborhood
-geometry — but it captures a different aspect of how temporal information is
-encoded.
+overlap, showing a reproducible advantage for joint token-time conditioning when
+only subject identity and period remain as evidence. On the continuation split,
+Additive and Token-Time reach the same accuracy (\(0.763\); Table~\ref{tab:main-results}),
+consistent with the indistinguishability on drift score. Probe accuracy alone is
+insufficient to establish temporal traceability --- it measures recoverability of
+the planted label, not neighborhood geometry --- but the split-dependent pattern
+suggests that joint conditioning encodes temporal information more precisely in
+the subject representation, with the advantage visible only when local markers
+are removed.
 
 The contrastive sign-flip rates are similar across conditioned models: Standard
 \(0.000\), Additive \(0.602\) \([0.549, 0.655]\), Token-Time \(0.624\)
