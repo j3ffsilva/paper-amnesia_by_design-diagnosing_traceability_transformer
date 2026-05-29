@@ -98,7 +98,7 @@ def make_figure(agg: pd.DataFrame):
         markers=True,
         labels={
             "epoch": "Epoch",
-            "mean": "Context-A neighbor share",
+            "mean": "Proportion of N₁ neighbors",
             "model_label": "Model",
             "class_label": "Subject class",
         },
