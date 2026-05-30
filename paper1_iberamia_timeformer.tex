@@ -14,10 +14,6 @@
 
 \begin{document}
 
-% Candidate titles (most evaluation-centric is active):
-% [A] Temporal Traceability in Transformer Representations: A Controlled Diagnostic Evaluation
-% [B] Geometric Temporal Traceability: Controlled Diagnostics for Transformer Conditioning Architectures
-% [C] Amnesia by Design: Diagnosing Temporal Traceability in Transformer Representations
 \title{Amnesia by Design: Diagnosing Temporal Traceability in Transformer Representations}
 \titlerunning{Amnesia by Design: Temporal Traceability in Transformer Representations}
 
@@ -29,82 +25,39 @@
 \maketitle
 
 \begin{abstract}
-Words do not preserve fixed meanings across time. \texttt{gay@1920} and
-\texttt{gay@1980} are different semantic objects, yet transformers represent
-both in a shared geometric space. Masked language modeling rewards correct
-token prediction rather than geometric consistency across time, so
-\emph{temporal traceability} (whether a token occupies different representational
-neighborhoods at different periods) is not directly optimized.
+Words do not preserve fixed meanings across time. Without representations that 
+reflect this, token@time queries become impossible: there is no way to ask where 
+the meaning of \emph{gay} stood in 1920, or how it moved by 1980, if both 
+queries return the same geometric object. Yet time-conditioned transformers have 
+never been tested on whether they actually achieve this geometrically. Knowing 
+that a representation encodes the correct period label is not the same as knowing 
+whether it occupies a period-appropriate neighborhood, a distinction we formalize 
+as \emph{temporal traceability}. We introduce a controlled diagnostic suite 
+with planted trajectories (stable, drifting, bifurcating) to measure it directly.
 
-Our central contribution is a controlled diagnostic suite with planted
-trajectories (stable, drifting, bifurcating) and a diagnostic battery targeting
-neighborhood geometry; using it we evaluate temporal conditioning architectures
-against non-temporal (Standard) and global-signal (Additive) baselines.
-Conditioning of any form substantially increases neighborhood drift for drifting
-subjects relative to Standard; Additive and joint token-time conditioning
-(Token-Time) produce equivalent aggregate drift, with a reproducible advantage
-for Token-Time appearing only when local markers are removed (ambiguous split,
-probe accuracy 0.595 vs.\ 0.579). The Memory-Augmented extension exposes
-mean-prototype aggregation as a second failure mode: when a word develops
-coexisting senses, a mean prototype collapses both into a centroid that
-represents neither.
-
-The results matter for applications requiring word meaning at a specific
-period. They suggest that temporal traceability requires training objectives
-aligned with trajectory geometry.
+Three findings emerge. Any form of temporal conditioning more than doubles 
+neighborhood displacement relative to the non-temporal baseline. However, a 
+simple global period signal and joint token-time conditioning are geometrically 
+equivalent under reliable local markers; the difference only appears when those 
+markers are removed. Finally, for words that develop two coexisting senses, mean 
+prototypes fail systematically: they collapse both senses into a centroid that 
+represents neither. The results point to the need for training objectives aligned 
+with trajectory geometry.
 
 \keywords{Temporal semantics \and Semantic change \and Transformer models \and Traceability \and Diagnostic evaluation}
 \end{abstract}
 
 \section{Introduction}
-% Target length: 1.0--1.25 pages.
-Words do not preserve fixed meanings across time. In 1900, \emph{broadcast}
-referred to scattering seeds across a field; today it describes a social media
-post reaching millions of users. Whether the shift of \emph{gay} from
-\emph{cheerful} to its contemporary sense involved movement toward or away
-from stigmatized terms~\cite{hamilton2016diachronic} is an empirical question
-that requires \texttt{gay@1920} and \texttt{gay@1980} as directly comparable
-objects in a shared geometric space.
 
-Contextualized embeddings disambiguate senses through local sentential context,
-not period: \emph{virus} is represented differently near \emph{malware} than
-near \emph{infection}, regardless of the year. The limitation appears when one
-wants \texttt{token@time} as a directly inspectable object; diachronic analysis
-asks where a meaning moved, not which sense local context happens to
-select.
+Words do not preserve fixed meanings across time. In 1900, \emph{broadcast} referred to scattering seeds across a field; today it describes a social media post reaching millions. The computational study of such shifts, lexical semantic change detection (LSCD), typically works by training distributional representations on time-sliced corpora and comparing them across periods~\cite{schlechtweg2020semeval,tahmasebi2021survey}. One model associates \emph{broadcast} with \emph{sow} and \emph{field}; another, trained on later data, associates it with \emph{signal} and \emph{audience}; semantic change is inferred from the distance between the two spaces. This approach has produced important methods and benchmarks, but it summarizes change as a single similarity score between two separately trained models. \texttt{broadcast@1900} and \texttt{broadcast@2020} are implicit in those models, not directly inspectable within a shared geometric space.
 
-Masked language modeling masks a token and asks the model to reconstruct it
-from its neighbors. To do this well, the model learns local context; it has no
-direct incentive to place the same token in period-appropriate regions of the
-representation space. Temporal traceability means that \texttt{virus@1900} and
-\texttt{virus@2020} occupy different neighborhoods. It requires a training
-signal aligned with geometric consistency across time, which the MLM objective
-does not provide.
+We call a representation \emph{temporally traceable} if the same surface token, queried at different periods, occupies neighborhoods consistent with its meaning at that period—making \texttt{token@time} a directly inspectable object. Consider \emph{gay}, which in the early twentieth century was mainly associated with \emph{cheerful} and \emph{merry}, and by the late twentieth century with \emph{queer} and \emph{lesbian}~\cite{hamilton2016diachronic}. Whether this shift involved movement toward or away from stigmatized terms~\cite{hamilton2016diachronic} is an empirical question that requires \texttt{gay@1920} and \texttt{gay@1980} as directly comparable objects.
 
-Testing this limitation requires a controlled environment where the correct answer
-is known. Natural-language corpora entangle semantic change with frequency,
-genre, and subcorpus shifts, making it hard to attribute a representational
-effect to architecture rather than data.
+Testing whether a representation achieves this property requires a controlled environment where the correct answer is known. Natural-language corpora entangle semantic change with frequency, genre, and subcorpus shifts, making it hard to attribute a representational effect to architecture rather than data. We therefore introduce a diagnostic suite with planted trajectories—stable, drifting, and bifurcating—and a battery that separates neighborhood geometry from period-label recoverability.
 
-Against this diagnostic suite we evaluate temporal conditioning architectures:
-a non-temporal baseline (Standard), a global-signal baseline (Additive), joint
-token-time conditioning (Token-Time), and a memory-augmented extension. The
-central empirical question is whether conditioning of any form improves
-geometric traceability over the non-temporal baseline, and what the form of
-conditioning contributes. Adjudication between conditioning forms across noisier
-regimes and natural corpora is left for future work.
+Against this suite we evaluate four conditioning architectures: a non-temporal baseline, a global-signal baseline, joint token-time conditioning, and a memory-augmented extension. Our research question is whether any form of conditioning improves geometric traceability over the non-temporal baseline, and what the specific form contributes. Evaluation on noisier regimes and natural corpora is left for future work.
 
-The paper makes four contributions. (1)~We establish temporal traceability as
-a geometric property distinct from period-label recoverability, and motivate
-why the MLM objective does not directly optimize it. (2)~We introduce a
-controlled diagnostic suite with planted trajectories (stable, drifting,
-bifurcating) and a diagnostic battery separating neighborhood geometry from
-label recoverability. (3)~Using this suite we show that conditioning of any
-form substantially improves geometric drift over the non-temporal baseline, and
-that the conditioning form is not separable on aggregate drift in this regime
-(preliminary separation appears only when local markers are removed). (4)~We
-identify mean-prototype aggregation as a failure mode for bifurcating subjects.
-
+The paper makes four contributions. (1) We establish temporal traceability as a geometric property distinct from period-label recoverability, and motivate why standard training objectives do not directly optimize it. (2) We introduce a controlled diagnostic suite with planted trajectories — stable, drifting, and bifurcating — and a four-diagnostic battery that targets neighborhood geometry rather than label recovery. (3) Using this suite, we show that any form of temporal conditioning more than doubles neighborhood displacement for drifting subjects relative to the non-temporal baseline; however, a global period signal (Additive) suffices to reproduce this effect under reliable local markers, and joint token-time conditioning (Token-Time) only pulls ahead when those markers are removed. (4) We identify mean-prototype aggregation as a failure mode for bifurcating subjects: when a word develops two coexisting senses, a mean prototype collapses both into a centroid that represents neither.
 
 \section{Related Work}
 % Target length: under 1 page.
@@ -241,7 +194,6 @@ summarizes the comparison.
 
 \begin{figure}[t]
 \centering
-% TODO: regenerate Figure 2 to remove the word "Timeformer" from the diagram image.
 \includegraphics[width=\textwidth]{outputs/figures/figure2_architecture_detail.png}
 \caption{Controlled design comparison. \textbf{Standard}: Transformer baseline
 with no temporal signal. \textbf{Additive}: temporal baseline that adds the same
@@ -563,53 +515,55 @@ Mem-Aug.\ oracle   & 0.769 [$\pm$0.004] & 0.694 [$\pm$0.059] & $+$0.007 [$\pm$0.
 
 \section{Discussion and Conclusion}
 % Target length: 1.25--1.5 pages.
-Conditioned models improve neighborhood drift substantially
-(\(\Delta\approx-0.563\) vs.\ \(-0.221\) for Standard), but no architecture
-matches the planted trajectories across all diagnostics: even oracle memory
-raises continuation accuracy only to \(0.769\). The pattern points to the MLM
-objective, which rewards token prediction rather than geometric consistency
-across periods; traceability appears only as a by-product.
+This work establishes that temporal conditioning makes token\texttt{@}time
+queries geometrically meaningful. Any form of conditioning more than doubles
+neighborhood displacement for drifting subjects relative to the non-temporal
+baseline, and the diagnostic suite distinguishes all three trajectory classes
+without relying on probe accuracy alone. These results open a path toward
+representations in which \textit{gay}@1920 and \textit{gay}@1980 occupy
+different, directly inspectable neighborhoods in a shared geometric space.
 
-In this controlled, high-fidelity setting Additive and Token-Time are equivalent
-on aggregate drift score (TOST, \(\delta=0.05\), \(p_\mathrm{TOST}<0.001\)):
-a global temporal signal suffices to reproduce neighborhood movement under
-reliable local markers, and adjudication between conditioning strategies across
-noise regimes is left for future work. The only reproducible distinction appears
-on the ambiguous split (\(0.595\) vs.\ \(0.579\), non-overlapping CIs), where
-local markers carry no signal: preliminary evidence that joint conditioning
-encodes temporal information more precisely in harder conditions. Layer-wise CKA corroborates this: Additive vs.\ Token-Time similarity increases
-from 0.726 to 0.887 across encoder depth (Standard stays near 0.22), suggesting
-self-attention absorbs the input-level difference.
+Within this controlled setting, a global temporal signal suffices to reproduce
+aggregate neighborhood movement under reliable local markers: Additive and
+Token-Time are equivalent on drift score (TOST, \(\delta=0.05\),
+\(p_\mathrm{TOST}<0.001\)). The only reproducible distinction between
+conditioning strategies appears on the ambiguous split (\(0.595\)
+vs.\ \(0.579\), non-overlapping CIs), where local markers carry no signal,
+suggesting that joint conditioning encodes temporal information more precisely
+when context is degraded. Layer-wise CKA corroborates this: Additive
+vs.\ Token-Time similarity increases from 0.726 to 0.887 across encoder depth
+(Standard stays near 0.22), suggesting self-attention absorbs the input-level
+difference. Adjudication between conditioning strategies across noisier regimes
+and natural corpora remains open.
 
-The Memory-Augmented extension points to a second failure mode. For
-bifurcating subjects, which develop two coexisting senses in later periods, a
-mean prototype lies between clusters and represents neither well. The oracle
-diagnostic shows that the memory pathway can use better historical signals:
-fixed vectors encoding the true \(P(N_1 \mid s, t)\) trajectory increase the
-sign-flip rate by \(+0.070\) over Token-Time (\(0.694\) vs.\ \(0.624\)). The
-learned mean prototypes cannot preserve the internal structure of a word's
-sense distribution; geometry-based mode-separation metrics confirm no
-architecture outperforms Additive in separating the two sense clusters for
-bifurcating subjects.
+Two failure modes point to directions for future work. First, for bifurcating
+subjects, mean prototypes collapse two coexisting senses into a centroid that
+represents neither. The oracle diagnostic shows the memory pathway itself is
+sound: fixed vectors encoding the true \(P(N_1 \mid s, t)\) trajectory increase
+the sign-flip rate by \(+0.070\) over Token-Time (\(0.694\) vs.\ \(0.624\)).
+The bottleneck is aggregation, not the pathway; future work should explore
+memory mechanisms that preserve distributional structure rather than collapsing
+each period to a single prototype. Second, no architecture achieves full
+traceability across all diagnostics, pointing to a mismatch between current
+training objectives, which reward local prediction accuracy, and the geometric
+consistency across periods that traceability requires.
 
 These conclusions come from controlled diagnostics, not open-domain diachronic
-language. The probe-level advantage of Token-Time over Additive is statistically
-stable but modest (1.6 percentage points) and does not appear on the drift
-score; it may not generalize beyond fixed subject positions and a small
-vocabulary. The suite was co-designed with the evaluated architectures to characterize them;
-the paper does not claim it as an independent validation of any architecture as
-a definitive solution to temporal traceability.
+language. The probe-level advantage of Token-Time over Additive is
+statistically stable but modest (1.6 percentage points) and does not appear on
+the drift score; it may not generalize beyond fixed subject positions and a
+small vocabulary. The suite was co-designed with the evaluated architectures to
+characterize them; the paper does not claim it as an independent validation of
+any architecture as a definitive solution to temporal traceability.
 
-Two directions remain open. First, Token-Time layer-0 heads show greater
+Two further directions remain open. Token-Time layer-0 heads show greater
 temporal variance in attention mass (L0H3: 0.0075 vs.\ Additive 0.0033), yet
 ablating individual heads only partially reduces representational alignment
 (L0H0: \(\Delta=-0.026\); L0H1: \(\Delta=-0.021\)), suggesting a distributed
-effect; a pilot noise sweep (3 seeds, slope\(=+1.07\), \(p=0.002\)) is
+effect. A pilot noise sweep (3 seeds, slope\(=+1.07\), \(p=0.002\)) is
 consistent with Token-Time retaining a drift advantage under degraded markers,
-but needs replication across noise regimes and natural corpora. Second, memory
-mechanisms need to preserve the internal structure of historical representations
-rather than collapsing each period to a single prototype, the primary open
-problem for bifurcating subjects.
+but replication across noise regimes and natural corpora is needed before
+stronger claims can be made.
 
 % Bibliography
 \bibliographystyle{splncs04}
